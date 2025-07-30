@@ -1,0 +1,12 @@
+{
+  "info": {
+        "1": "RightVentricle",
+        "2": "Myocardium",
+        "3": "LeftVentricle"
+    },
+    "color": {
+        "1": 1,
+        "2": 2,
+        "3": 3
+    }
+}

@@ -1,0 +1,21 @@
+# Ignore Git directories within cloned sub-directories
+LiteMedSAM/.git/
+Medical-SAM-Adapter/.git/
+MedSAM/.git/
+SAM_Med2D/.git/
+SAM4Med/.git/
+# Add other subdirectories as needed
+data/
+LiteMedSAM/overlay/
+LiteMedSAM/work_dir/
+LiteMedSAM/metrics.csv
+Medical-SAM-Adapter/checkpoint/
+MedSAM/work_dir/
+SAM_Med2D/pretrain_model/
+SAM4Med/model/
+SAM4Med/sam_vit_b_01ec64.pth
+# You might also want to ignore common Python-related files/directories
+__pycache__/
+*.pyc
+venv/
+.env
