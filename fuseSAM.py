@@ -46,7 +46,8 @@ def knowledge_externalization(models : list,
             continue
         t = time.time()
         dataset.set_transforms(model_name)
-        dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
+        num_workers = 4 if colab else 0
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
         
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
         # load model
@@ -54,7 +55,7 @@ def knowledge_externalization(models : list,
         if args.device == "mps":
             gpu_memory_bytes = torch.mps.current_allocated_memory()
         else:
-            gpu_memory_bytes = torch.cuda.current_allocated_memory()
+            gpu_memory_bytes = torch.cuda.memory_allocated()
         print(f"VRAM memory allocated: {gpu_memory_bytes / (1024**2):.2f} MB")
         print(f"Loaded model: {model_name}")
         loss = []

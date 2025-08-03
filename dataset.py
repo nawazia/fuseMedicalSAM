@@ -275,7 +275,6 @@ class MiniMSAMDataset(Dataset):
         Args:
             data_path (str): Path to the directory containing images and masks folder.
             json_path (str): Path to the JSON file containing image-mask pairs.
-            model (str, optional): Optional model-specific transforms to be applied on a sample, denoted by model type.
         """
         self.data_path = data_path
         self.json_path = json_path
@@ -283,7 +282,7 @@ class MiniMSAMDataset(Dataset):
             self.data = json.load(file)
         self.image_paths = list(self.data.keys())
         self.num_masks = 0 # add num of masks from data dict
-        for image, masks in self.data.items():
+        for _, masks in self.data.items():
             self.num_masks += len(masks)
         # print(self.num_masks)
 
