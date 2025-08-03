@@ -45,7 +45,7 @@ def knowledge_externalization(models : list,
 
     for model_name in models:
         # check if all logits already exist
-        if len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) == num_masks:
+        if len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) >= num_masks:
             print(f"All mask logits for {model_name} already exist, skipping model...")
             continue
         t = time.time()
