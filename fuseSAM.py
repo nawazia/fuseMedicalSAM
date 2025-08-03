@@ -15,7 +15,7 @@ from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
 
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
-                              save_path : str = "mask_logits", device = "cpu", colab = False):
+                              save_path : str = "mask_logits", device = "cpu", num_workers=0, colab = False):
     '''
     1. Create bounding box prompts per image
     2. For each model:
@@ -52,7 +52,6 @@ def knowledge_externalization(models : list,
             continue
         t = time.time()
         dataset.set_transforms(model_name)
-        num_workers = 0 if colab else 0
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
         
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
@@ -147,12 +146,12 @@ def fuse(models : list,
     dataset.unset_simple()
     return 0
 
-def main(data_path: str, json_path: str, device: str = "cpu", colab=False):
+def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
-    mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, colab=colab)
+    mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
 
     fuse(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)
     return
@@ -164,7 +163,8 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", required=True, help="Path to dir containing images and masks (and created mask_logits) folders")
     parser.add_argument("--json_path", required=True, help="Path to JSON files containing image-mask pairs.")
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
+    parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
     parser.add_argument("--colab", action="store_true", help="Run on Colab (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, colab=args.colab)
+    main(args.data_path, args.json_path, device=args.device, num_workers=args.num_workers, colab=args.colab)
