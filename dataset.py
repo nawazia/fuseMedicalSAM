@@ -365,7 +365,6 @@ class MiniMSAMDataset(Dataset):
         # Load the masks, assuming they're grayscale
         masks = []
         for mask_path in mask_paths_full:
-            print("mask_path:", mask_path)
             mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
             mask = (mask > 0).astype(np.uint8)
             masks.append(mask)
