@@ -6,11 +6,12 @@ import tqdm
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+from torch.utils.data import DataLoader
 
 from dataset import MiniMSAMDataset
 from models import load_model, calculate_segmentation_losses
-import torch
-from torch.utils.data import DataLoader
+from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
 
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
@@ -37,7 +38,8 @@ def knowledge_externalization(models : list,
 
     Returns
     -------
-    None
+    save_path : str
+        Path where the mask logits will be saved. Defaults to "mask_logits".
     '''
     os.makedirs(save_path, exist_ok=True)
 
@@ -104,10 +106,11 @@ def knowledge_externalization(models : list,
                 print("Mean BCE loss:",np.mean(loss[-100:]))
             #     break
         print(f"Finished processing {model_name} in {time.time() - t:.2f} seconds")
-    return 0
+    return save_path
 
 def fuse(models : list,
         dataset : MiniMSAMDataset,
+        mask_path : str = "mask_logits",
         save_path : str = "fused", colab = False):
     '''
     For each mask:
@@ -121,8 +124,10 @@ def fuse(models : list,
         List of SAM models to be used for fusion.
     dataset : MiniMSAMDataset
         Dataset for the dataset containing images.
+    mask_path : str
+        Path where the mask logits are be saved. Defaults to "mask_logits".
     save_path : str
-        Path where the fused mask_logits will be saved.
+        Path where the fused mask_logits will be saved. Defaults to "fused".
     colab : bool
         Flag to indicate Colab use. Defaults to False.
 
@@ -130,11 +135,16 @@ def fuse(models : list,
     -------
     None
     '''
+    dataset.set_simple()
     for i, data in enumerate(tqdm.tqdm(dataset)):
         mask_filenames = data["mask_filenames"]
         print(mask_filenames)
-        break
+        # load images from mask_path/model_name
+        for mask_filename in mask_filenames:
+            data = ImageLevelFusion(models, mask_path, mask_filename)
 
+        break
+    dataset.unset_simple()
     return 0
 
 def main(data_path: str, json_path: str, device: str = "cpu", colab=False):
@@ -142,9 +152,9 @@ def main(data_path: str, json_path: str, device: str = "cpu", colab=False):
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
-    knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, colab=colab)
+    mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, colab=colab)
 
-    fuse(models, dataset, save_path=os.path.join(data_path, "fused"), colab=colab)
+    fuse(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)
     return
 
 

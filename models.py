@@ -253,7 +253,7 @@ def load_model(model_name: str, device='cpu', colab=False):
     elif model_name == "SAM-Med2D":
         # Load SAM-Med2D model
         print("\nLoading SAM-Med2D model...")
-        sam_med2d_checkpoint = "SAM_Med2d/pretrain_model/sam-med2d_b.pth"
+        sam_med2d_checkpoint = "SAM_Med2D/pretrain_model/sam-med2d_b.pth"
         if colab:
             sam_med2d_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + sam_med2d_checkpoint
         model_type = "vit_b"
