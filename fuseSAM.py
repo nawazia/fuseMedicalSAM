@@ -51,8 +51,11 @@ def knowledge_externalization(models : list,
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
         # load model
         model = load_model(model_name, device)
-        mps_memory_bytes = torch.mps.current_allocated_memory()
-        print(f"MPS memory allocated: {mps_memory_bytes / (1024**2):.2f} MB")
+        if args.device == "mps":
+            gpu_memory_bytes = torch.mps.current_allocated_memory()
+        else:
+            gpu_memory_bytes = torch.cuda.current_allocated_memory()
+        print(f"VRAM memory allocated: {gpu_memory_bytes / (1024**2):.2f} MB")
         print(f"Loaded model: {model_name}")
         loss = []
         for i, data in enumerate(tqdm.tqdm(dataloader)):
@@ -101,7 +104,7 @@ def knowledge_externalization(models : list,
 def fuse(data_path: str, json_path: str, device: str = "cpu"):
     dataset = MiniMSAMDataset(data_path, json_path)
 
-    models = ["SAM4Med", "SAM-Med2D"]#"MedSAM", "Med-SA"]
+    models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
     knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device)
 
