@@ -154,7 +154,7 @@ class SAM_Med2D(nn.Module):
         # masks = masks.squeeze(1).cpu().numpy()
         return masks
 
-def load_model(model_name: str, device='cpu'):
+def load_model(model_name: str, device='cpu', colab=False):
     """
     Placeholder function to load a model by its name.
     In practice, this function should load the actual model weights and architecture.
@@ -165,6 +165,8 @@ def load_model(model_name: str, device='cpu'):
     if model_name == "MedSAM":
         print("\nLoading MedSAM model...")
         medsam_checkpoint = "MedSAM/work_dir/MedSAM/medsam_vit_b.pth"
+        if colab:
+            medsam_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + medsam_checkpoint
         medsam = MedSAM("vit_b", 1024, medsam_checkpoint)
         medsam.to(device)
         medsam.eval()
@@ -174,6 +176,8 @@ def load_model(model_name: str, device='cpu'):
         # Load LiteMedSAM model
         print("\nLoading LiteMedSAM model...")
         lite_medsam_checkpoint = "LiteMedSAM/work_dir/LiteMedSAM/lite_medsam.pth"
+        if colab:
+            lite_medsam_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + lite_medsam_checkpoint
         medsam_lite_image_encoder = TinyViT(
         img_size=256,
         in_chans=3,
@@ -232,6 +236,9 @@ def load_model(model_name: str, device='cpu'):
         print("\nLoading SAM4Med model...")
         og_checkpoint = "SAM4Med/sam_vit_b_01ec64.pth"
         sam4med_checkpoint = "SAM4Med/model/medsam_box_best_vitb.pth"
+        if colab:
+            og_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + og_checkpoint
+            sam4med_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + sam4med_checkpoint
         model_type = "vit_b"
 
         # SAM4Med
@@ -247,6 +254,8 @@ def load_model(model_name: str, device='cpu'):
         # Load SAM-Med2D model
         print("\nLoading SAM-Med2D model...")
         sam_med2d_checkpoint = "SAM_Med2d/pretrain_model/sam-med2d_b.pth"
+        if colab:
+            sam_med2d_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + sam_med2d_checkpoint
         model_type = "vit_b"
         sam_med2d = SAM_Med2D(model_type=model_type, image_size=256, sam_checkpoint=sam_med2d_checkpoint, encoder_adapter=True)
         sam_med2d.to(device)

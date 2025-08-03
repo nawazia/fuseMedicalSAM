@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
-                              save_path : str = "mask_logits", device = "cpu"):
+                              save_path : str = "mask_logits", device = "cpu", colab = False):
     '''
     1. Create bounding box prompts per image
     2. For each model:
@@ -50,7 +50,7 @@ def knowledge_externalization(models : list,
         
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
         # load model
-        model = load_model(model_name, device)
+        model = load_model(model_name, device, colab)
         if args.device == "mps":
             gpu_memory_bytes = torch.mps.current_allocated_memory()
         else:
@@ -101,12 +101,12 @@ def knowledge_externalization(models : list,
         print(f"Finished processing {model_name} in {time.time() - t:.2f} seconds")
     return 0
 
-def fuse(data_path: str, json_path: str, device: str = "cpu"):
+def fuse(data_path: str, json_path: str, device: str = "cpu", colab=False):
     dataset = MiniMSAMDataset(data_path, json_path)
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
-    knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device)
+    knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, colab=colab)
 
     return
 
@@ -117,6 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", required=True, help="Path to dir containing images and masks (and created mask_logits) folders")
     parser.add_argument("--json_path", required=True, help="Path to JSON files containing image-mask pairs.")
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
+    parser.add_argument("--colab", action="store_true", help="Run on Colab (default: False)")
     args = parser.parse_args()
 
-    fuse(args.data_path, args.json_path, device=args.device)
+    fuse(args.data_path, args.json_path, device=args.device, colab=args.colab)
