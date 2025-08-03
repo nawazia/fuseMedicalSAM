@@ -270,7 +270,7 @@ class ConditionalPadOrResize(A.DualTransform):
         return ("target_size", "resize_interpolation", "pad_border_mode", "pad_value", "pad_mask_value")
 
 class MiniMSAMDataset(Dataset):
-    def __init__(self, data_path, json_path):
+    def __init__(self, data_path, json_path, split="train"):
         """
         Args:
             data_path (str): Path to the directory containing images and masks folder.
@@ -279,15 +279,12 @@ class MiniMSAMDataset(Dataset):
         self.data_path = data_path
         self.json_path = json_path
         with open(self.json_path, 'r') as file:
-            self.data = json.load(file)
+            data = json.load(file)
+        self.data = data[split]
         self.image_paths = list(self.data.keys())
         self.num_masks = 0 # add num of masks from data dict
         for _, masks in self.data.items():
             self.num_masks += len(masks)
-        # print(self.num_masks)
-
-    def get_num_masks(self):
-        return self.num_masks
 
     def set_transforms(self, model : str = None):
         """ Set the transformation pipeline based on the model type.
@@ -337,7 +334,7 @@ class MiniMSAMDataset(Dataset):
             p=1.0)
 
     def __len__(self):
-        return len(self.data)
+        return self.num_masks
 
     def __getitem__(self, idx):
         image_filename = self.image_paths[idx]
@@ -404,7 +401,6 @@ if __name__ == "__main__":
     
     dataset = MiniMSAMDataset(data_path=args.data_path, json_path=args.json_path)
     print(f"Dataset length: {len(dataset)}")
-    print(dataset.get_num_masks())
     dataset.set_transforms(model="MedSAM")
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
     
