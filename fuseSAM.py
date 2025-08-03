@@ -52,7 +52,7 @@ def knowledge_externalization(models : list,
             continue
         t = time.time()
         dataset.set_transforms(model_name)
-        num_workers = 4 if colab else 0
+        num_workers = 0 if colab else 0
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
         
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
