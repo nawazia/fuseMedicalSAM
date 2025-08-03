@@ -334,6 +334,9 @@ class MiniMSAMDataset(Dataset):
             p=1.0)
 
     def __len__(self):
+        return len(self.data)
+
+    def get_num_masks(self):
         return self.num_masks
 
     def __getitem__(self, idx):
