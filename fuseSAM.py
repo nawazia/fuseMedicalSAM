@@ -29,7 +29,11 @@ def knowledge_externalization(models : list,
     dataset : MiniMSAMDataset
         Dataset for the dataset containing images.
     save_path : str
-        Path where the mask logits will be saved.
+        Path where the mask logits will be saved. Defaults to "mask_logits".
+    device : str
+        Device from ["cuda", "mps", "cpu"]. Defaults to "cpu".
+    colab : bool
+        Flag to indicate Colab use. Defaults to False.
 
     Returns
     -------
@@ -37,7 +41,7 @@ def knowledge_externalization(models : list,
     '''
     os.makedirs(save_path, exist_ok=True)
 
-    num_masks = dataset.get_num_masks()
+    num_masks = len(dataset)
 
     for model_name in models:
         # check if all logits already exist
@@ -102,13 +106,45 @@ def knowledge_externalization(models : list,
         print(f"Finished processing {model_name} in {time.time() - t:.2f} seconds")
     return 0
 
-def fuse(data_path: str, json_path: str, device: str = "cpu", colab=False):
-    dataset = MiniMSAMDataset(data_path, json_path)
+def fuse(models : list,
+        dataset : MiniMSAMDataset,
+        save_path : str = "fused", colab = False):
+    '''
+    For each mask:
+    1. Load .npz for models in models
+    2. Calculate fusion loss
+    3. Argmin, save to save_path
+
+    Parameters
+    ----------
+    models : list
+        List of SAM models to be used for fusion.
+    dataset : MiniMSAMDataset
+        Dataset for the dataset containing images.
+    save_path : str
+        Path where the fused mask_logits will be saved.
+    colab : bool
+        Flag to indicate Colab use. Defaults to False.
+
+    Returns
+    -------
+    None
+    '''
+    for i, data in enumerate(tqdm.tqdm(dataset)):
+        mask_filenames = data["mask_filenames"]
+        print(mask_filenames)
+        break
+
+    return 0
+
+def main(data_path: str, json_path: str, device: str = "cpu", colab=False):
+    dataset = MiniMSAMDataset(data_path, json_path, "train")
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
     knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, colab=colab)
 
+    fuse(models, dataset, save_path=os.path.join(data_path, "fused"), colab=colab)
     return
 
 
@@ -121,4 +157,4 @@ if __name__ == "__main__":
     parser.add_argument("--colab", action="store_true", help="Run on Colab (default: False)")
     args = parser.parse_args()
 
-    fuse(args.data_path, args.json_path, device=args.device, colab=args.colab)
+    main(args.data_path, args.json_path, device=args.device, colab=args.colab)
