@@ -23,5 +23,8 @@ def UnsupervisedFusion(models, mask_path):
 
     return
 
+def loss_function():
+    return
+
 if __name__ == "__main__":
     ImageLevelFusion(["MedSAM"], "/Users/i/ICL/fusion/code/data/17K/SAMed2Dv1/mask_logits/", "mr_00--AMOS2022--amos_0596--y_0081--0002_000.png")

@@ -162,7 +162,8 @@ def fuse_multithread(models: list,
 
     Returns
     -------
-    None
+    save_path : str
+        Path where the fused mask_logits are saved. Defaults to "fused".
     '''
     os.makedirs(save_path, exist_ok=True)
     dataset.set_simple(True)
@@ -195,10 +196,38 @@ def fuse_multithread(models: list,
     dataset.set_simple(False)
     return save_path
 
-def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str, device="cpu", num_workers=0, colab=False):
+def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False):
+    '''
+    1. Load target model in train mode.
+
+
+    Parameters
+    ----------
+    target : str
+        Pre-trained finetuned SAM to be used for target model.
+    dataset : MiniMSAMDataset
+        Dataset for the dataset containing images.
+    fused_path : str
+        Path where the fused mask_logits are saved. Defaults to "fused".
+    device : str
+        Device from ["cuda", "mps", "cpu"]. Defaults to "cpu".
+    max_workers : int
+        Maximum number of threads to use. Defaults to min(32, os.cpu_count() + 4).
+    colab : bool
+        Flag to indicate Colab use. Defaults to False.
+
+    Returns
+    -------
+    None
+    '''
     dataset.set_transforms(target)
     model = load_model(target, device, colab)
-
+    if args.device == "mps":
+        gpu_memory_bytes = torch.mps.current_allocated_memory()
+    else:
+        gpu_memory_bytes = torch.cuda.memory_allocated()
+    print(f"VRAM memory allocated: {gpu_memory_bytes / (1024**2):.2f} MB")
+    print(f"Loaded model: {target}")
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     for i, data in enumerate(tqdm.tqdm(dataloader)):
         print(data)

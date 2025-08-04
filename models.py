@@ -156,8 +156,7 @@ class SAM_Med2D(nn.Module):
 
 def load_model(model_name: str, device='cpu', colab=False):
     """
-    Placeholder function to load a model by its name.
-    In practice, this function should load the actual model weights and architecture.
+    Loads a model weights and architecture by its name.
     """
     if model_name not in ["MedSAM", "LiteMedSAM", "SAM4Med", "SAM-Med2D", "Med-SA"]:
         raise ValueError(f"Model {model_name} is not recognized.")
