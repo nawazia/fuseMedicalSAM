@@ -143,8 +143,11 @@ def fuse(models : list,
         print(mask_filenames)
         # load images from mask_path/model_name
         for mask_filename in mask_filenames:
-            best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
             mask_save_path = os.path.join(save_path, f"{mask_filename[:-4]}_mask_logits")
+            if os.path.exists(mask_save_path + ".npz"):
+                print(mask_save_path + ".npz already exists, skipping...")
+                continue
+            best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
             print(f"Saving mask logits to: {mask_save_path}")
             np.savez_compressed(mask_save_path + ".npz", **best_data)
             counts[best_model] = counts.get(best_model, 0) + 1
