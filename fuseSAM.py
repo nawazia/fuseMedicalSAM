@@ -165,6 +165,10 @@ def fuse_multithread(models: list,
     '''
     os.makedirs(save_path, exist_ok=True)
     dataset.set_simple(True)
+
+    if len(glob.glob(os.path.join(save_path, "*.npz"))) == dataset.get_num_masks():
+        print(f"All fused mask logits already exist, skipping...")
+        return save_path
     
     counts = dict() # Regular dictionary for threads
 
