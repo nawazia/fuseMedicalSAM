@@ -6,15 +6,24 @@ import tqdm
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-
-from dataset import MiniMSAMDataset
-from models import load_model, calculate_segmentation_losses
 import torch
 from torch.utils.data import DataLoader
 
+from dataset import MiniMSAMDataset
+from models import load_model, calculate_segmentation_losses
+from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
+
+def count_files_scandir(directory_path):
+    count = 0
+    with os.scandir(directory_path) as entries:
+        for entry in entries:
+            if entry.is_file():
+                count += 1
+    return count
+
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
-                              save_path : str = "mask_logits", device = "cpu", colab = False):
+                              save_path : str = "mask_logits", device = "cpu", num_workers=0, colab = False):
     '''
     1. Create bounding box prompts per image
     2. For each model:
@@ -37,20 +46,20 @@ def knowledge_externalization(models : list,
 
     Returns
     -------
-    None
+    save_path : str
+        Path where the mask logits will be saved. Defaults to "mask_logits".
     '''
     os.makedirs(save_path, exist_ok=True)
 
-    num_masks = len(dataset)
+    num_masks = dataset.get_num_masks()
 
     for model_name in models:
         # check if all logits already exist
-        if len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) >= num_masks:
+        if count_files_scandir(os.path.join(save_path, model_name)) == num_masks:
             print(f"All mask logits for {model_name} already exist, skipping model...")
             continue
         t = time.time()
         dataset.set_transforms(model_name)
-        num_workers = 4 if colab else 0
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
         
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
@@ -104,10 +113,11 @@ def knowledge_externalization(models : list,
                 print("Mean BCE loss:",np.mean(loss[-100:]))
             #     break
         print(f"Finished processing {model_name} in {time.time() - t:.2f} seconds")
-    return 0
+    return save_path
 
 def fuse(models : list,
         dataset : MiniMSAMDataset,
+        mask_path : str = "mask_logits",
         save_path : str = "fused", colab = False):
     '''
     For each mask:
@@ -121,8 +131,10 @@ def fuse(models : list,
         List of SAM models to be used for fusion.
     dataset : MiniMSAMDataset
         Dataset for the dataset containing images.
+    mask_path : str
+        Path where the mask logits are be saved. Defaults to "mask_logits".
     save_path : str
-        Path where the fused mask_logits will be saved.
+        Path where the fused mask_logits will be saved. Defaults to "fused".
     colab : bool
         Flag to indicate Colab use. Defaults to False.
 
@@ -130,21 +142,26 @@ def fuse(models : list,
     -------
     None
     '''
+    dataset.set_simple()
     for i, data in enumerate(tqdm.tqdm(dataset)):
         mask_filenames = data["mask_filenames"]
         print(mask_filenames)
-        break
+        # load images from mask_path/model_name
+        for mask_filename in mask_filenames:
+            data = ImageLevelFusion(models, mask_path, mask_filename)
 
+        break
+    dataset.unset_simple()
     return 0
 
-def main(data_path: str, json_path: str, device: str = "cpu", colab=False):
+def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
-    knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, colab=colab)
+    mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
 
-    fuse(models, dataset, save_path=os.path.join(data_path, "fused"), colab=colab)
+    fuse(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)
     return
 
 
@@ -154,7 +171,8 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", required=True, help="Path to dir containing images and masks (and created mask_logits) folders")
     parser.add_argument("--json_path", required=True, help="Path to JSON files containing image-mask pairs.")
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
+    parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
     parser.add_argument("--colab", action="store_true", help="Run on Colab (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, colab=args.colab)
+    main(args.data_path, args.json_path, device=args.device, num_workers=args.num_workers, colab=args.colab)

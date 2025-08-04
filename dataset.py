@@ -285,6 +285,7 @@ class MiniMSAMDataset(Dataset):
         self.num_masks = 0 # add num of masks from data dict
         for _, masks in self.data.items():
             self.num_masks += len(masks)
+        self.simple = False
 
     def set_transforms(self, model : str = None):
         """ Set the transformation pipeline based on the model type.
@@ -334,11 +335,26 @@ class MiniMSAMDataset(Dataset):
             p=1.0)
 
     def __len__(self):
+        return len(self.data)
+
+    def get_num_masks(self):
         return self.num_masks
+    
+    def set_simple(self):
+        self.simple = True
+
+    def unset_simple(self):
+        self.simple = False
 
     def __getitem__(self, idx):
         image_filename = self.image_paths[idx]
         mask_filenames = self.data[image_filename]
+        if self.simple:
+            sample = {
+                'image_filename': image_filename,
+                'mask_filenames': mask_filenames
+            }
+            return sample
         image_path_full = os.path.join(self.data_path, image_filename)
         mask_paths_full = [os.path.join(self.data_path, mask_filename) for mask_filename in mask_filenames]
 
