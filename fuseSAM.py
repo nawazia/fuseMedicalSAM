@@ -86,6 +86,7 @@ def knowledge_externalization(models : list,
             # Generate mask logits
             # cv2.imwrite(f"img.tif", (data['image'].float().squeeze()[0].cpu().numpy()).astype(np.float32))
             mask_logits = model(data)
+            assert mask_logits.dim() == 4
             gt = data["original_masks"].to(device)
             # calculate losses
             dice, bce, iou = calculate_segmentation_losses(gt, mask_logits.permute(1, 0, 2, 3))
