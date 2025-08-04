@@ -17,7 +17,7 @@ from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
 
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
-                              save_path : str = "mask_logits", device = "cpu", num_workers=0, colab = False):
+                              save_path : str = "mask_logits", device = "cpu", num_workers = 0, colab = False):
     '''
     1. Create bounding box prompts per image
     2. For each model:
@@ -59,6 +59,7 @@ def knowledge_externalization(models : list,
         os.makedirs(os.path.join(save_path, model_name), exist_ok=True)
         # load model
         model = load_model(model_name, device, colab)
+        model.eval()
         if args.device == "mps":
             gpu_memory_bytes = torch.mps.current_allocated_memory()
         else:
@@ -194,18 +195,28 @@ def fuse_multithread(models: list,
     dataset.set_simple(False)
     return save_path
 
+def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str, device="cpu", num_workers=0, colab=False):
+    dataset.set_transforms(target)
+    model = load_model(target, device, colab)
+
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    for i, data in enumerate(tqdm.tqdm(dataloader)):
+        print(data)
+        break
+    return 0
+
 def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
+    target = "SAM-Med2D"
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
     # KE
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
     # Fusion
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
-    # Target model
-    target = "SAM-Med2D"
-    # continual_training()
+    # Continual training
+    model = continual_training(target, dataset, fused_path)
     return
 
 

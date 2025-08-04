@@ -169,7 +169,7 @@ def load_model(model_name: str, device='cpu', colab=False):
             medsam_checkpoint = "/content/drive/My Drive/fuseMedicalSAM/" + medsam_checkpoint
         medsam = MedSAM("vit_b", 1024, medsam_checkpoint)
         medsam.to(device)
-        medsam.eval()
+        # medsam.eval()
         return medsam
 
     if model_name == "LiteMedSAM":
@@ -229,7 +229,7 @@ def load_model(model_name: str, device='cpu', colab=False):
 
         litemedsam = LiteMedSAM(medsam_lite_model)
         litemedsam.to(device)
-        litemedsam.eval()
+        # litemedsam.eval()
         return litemedsam
     elif model_name == "SAM4Med":
         # Load SAM4Med model
@@ -248,7 +248,7 @@ def load_model(model_name: str, device='cpu', colab=False):
 
         sam4med = SAM4Med(predictor, model_type=model_type, checkpoint=og_checkpoint)
         sam4med.to(device)
-        sam4med.eval()
+        # sam4med.eval()
         return sam4med
     elif model_name == "SAM-Med2D":
         # Load SAM-Med2D model
@@ -259,7 +259,7 @@ def load_model(model_name: str, device='cpu', colab=False):
         model_type = "vit_b"
         sam_med2d = SAM_Med2D(model_type=model_type, image_size=256, sam_checkpoint=sam_med2d_checkpoint, encoder_adapter=True)
         sam_med2d.to(device)
-        sam_med2d.eval()
+        # sam_med2d.eval()
         return sam_med2d
     else:
         raise NotImplementedError(f"Loading for {model_name} is not implemented yet.")
