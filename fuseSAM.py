@@ -193,7 +193,6 @@ def fuse_multithread(models: list,
 
     print("Fusion complete. Model counts:")
     print(counts)
-    dataset.set_simple(False)
     return save_path
 
 def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False):
@@ -244,6 +243,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
     # Fusion
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
+    dataset.set_simple(False)
     # Continual training
     model = continual_training(target, dataset, fused_path, device=device, num_workers=num_workers, colab=colab)
     return
