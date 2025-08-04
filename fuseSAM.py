@@ -148,8 +148,8 @@ def fuse(models : list,
         print(mask_filenames)
         # load images from mask_path/model_name
         for mask_filename in mask_filenames:
-            data = ImageLevelFusion(models, mask_path, mask_filename)
-
+            best_model, data = ImageLevelFusion(models, mask_path, mask_filename)
+            print(best_model)
         break
     dataset.unset_simple()
     return 0
