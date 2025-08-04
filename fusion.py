@@ -65,9 +65,9 @@ class DiceLoss(nn.Module):
         # to get a single scalar for backpropagation.
         return torch.mean(dice_loss)
 
-class CombinedLoss(nn.Module):
+class SegmentationLoss(nn.Module):
     def __init__(self, dice_weight=1.0, bce_weight=1.0):
-        super(CombinedLoss, self).__init__()
+        super(SegmentationLoss, self).__init__()
         self.dice_loss = DiceLoss()
         self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
         self.dice_weight = dice_weight
@@ -82,6 +82,52 @@ class CombinedLoss(nn.Module):
         combined_loss = self.bce_weight * bce_loss + self.dice_weight * dice_loss
         
         return combined_loss, bce_loss, dice_loss # Return individual losses for monitoring
+
+class DistillationLoss(nn.Module):
+    def __init__(self, temperature=1.0):
+        super(DistillationLoss, self).__init__()
+        self.temperature = temperature
+        # Use BCEWithLogitsLoss for numerical stability
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
+
+    def forward(self, student_logits, teacher_logits):
+        # We need a "soft" target for the student. This is the teacher's softened output.
+        # F.sigmoid is used to get probabilities
+        # The output of sigmoid will be in the range [0, 1]
+        soft_targets = torch.sigmoid(teacher_logits / self.temperature)
+        
+        # We then compute the Binary Cross-Entropy between the student's
+        # temperature-scaled logits and the soft targets.
+        # F.binary_cross_entropy_with_logits is more numerically stable than
+        # applying sigmoid and then BCE loss.
+        # Note: The student's logits are also scaled by the temperature.
+        loss = self.bce_loss(student_logits / self.temperature, soft_targets)
+        
+        # A common practice is to scale the distillation loss by T^2 to keep
+        # its magnitude comparable to other losses.
+        return loss * (self.temperature ** 2)
+
+class CombinedLoss(nn.Module):
+    def __init__(self, dice_weight=1.0, bce_weight=1.0, lambda_weight=0.9, temperature=1.0):
+        super(CombinedLoss, self).__init__()
+        self.dice_loss = DiceLoss()
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
+        self.distillation_loss = DistillationLoss(temperature=temperature)
+        
+        self.dice_weight = dice_weight
+        self.bce_weight = bce_weight
+        self.lambda_weight = lambda_weight
+
+    def forward(self, pred_logits, teacher_logits, ground_truth_masks):
+        dice_loss = self.dice_loss(pred_logits, ground_truth_masks)
+        bce_loss = self.bce_loss(pred_logits, ground_truth_masks)
+        
+        distillation_loss = self.distillation_loss(pred_logits, teacher_logits)
+        
+        combined_loss = self.lambda_weight * ((self.bce_weight * bce_loss) + (self.dice_weight * dice_loss)) + \
+                        ((1 - self.lambda_weight) * distillation_loss)  
+        
+        return combined_loss, bce_loss, dice_loss, distillation_loss
 
 if __name__ == "__main__":
     ImageLevelFusion(["MedSAM"], "/Users/i/ICL/fusion/code/data/17K/SAMed2Dv1/mask_logits/", "mr_00--AMOS2022--amos_0596--y_0081--0002_000.png")

@@ -221,6 +221,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
     None
     '''
     dataset.set_transforms(target)
+    dataset.set_fused(fused_path)
     model = load_model(target, device, colab)
     model.train()
     if args.device == "mps":
@@ -242,17 +243,20 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
         mask_logits = model(data)                   # [4, 1, 208, 174]
         assert mask_logits.dim() == 4
         gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
+        teacher_logits = data["teacher_logits"].to(device)
+        print(teacher_logits.shape)
         # calculate losses
         optimizer.zero_grad()
         gt = gt.float()
         mask_logits = mask_logits.float()
-        combined_loss, bce_loss, dice_loss = criterion(mask_logits.permute(1, 0, 2, 3), gt)
+        combined_loss, bce_loss, dice_loss, distillation_loss = criterion(mask_logits.permute(1, 0, 2, 3), teacher_logits, gt)
         combined_loss.backward()
         optimizer.step()
         pbar.set_postfix({
             'total_loss': f'{combined_loss.item():.4f}',
             'bce_loss': f'{bce_loss.item():.4f}',
-            'dice_loss': f'{dice_loss.item():.4f}'
+            'dice_loss': f'{dice_loss.item():.4f}',
+            'distillation_loss': f'{distillation_loss.item():.4f}'
         })
         
     pbar.close()

@@ -286,6 +286,7 @@ class MiniMSAMDataset(Dataset):
         for _, masks in self.data.items():
             self.num_masks += len(masks)
         self.simple = False
+        self.fused_path = None
 
     def set_transforms(self, model : str = None):
         """ Set the transformation pipeline based on the model type.
@@ -342,6 +343,9 @@ class MiniMSAMDataset(Dataset):
     
     def set_simple(self, mode : bool):
         self.simple = mode
+
+    def set_fused(self, path : str):
+        self.fused_path = path
 
     def __getitem__(self, idx):
         image_filename = self.image_paths[idx]
@@ -400,6 +404,16 @@ class MiniMSAMDataset(Dataset):
             'mask_filenames': mask_filenames
         }
 
+        if self.fused_path:
+            fused_paths_full = [os.path.join(self.fused_path, os.path.basename(mask_filename)[:-4]+"_mask_logits.npz") for mask_filename in mask_filenames]
+            all_mask_logits = []
+            for npz_path in fused_paths_full:
+                with np.load(npz_path) as data:
+                    mask_logits = data['mask_logits']
+                    all_mask_logits.append(mask_logits)
+            # The final shape will be (num_masks, H, W)
+            stacked_logits = torch.from_numpy(np.stack(all_mask_logits, axis=0)).float()
+            sample['teacher_logits'] = stacked_logits
         return sample
 
 if __name__ == "__main__":
