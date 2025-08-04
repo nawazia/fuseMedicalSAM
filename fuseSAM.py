@@ -244,6 +244,10 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
         gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
         # calculate losses
         optimizer.zero_grad()
+        gt = gt.float()
+        mask_logits = mask_logits.float()
+        print(gt)
+        print(mask_logits)
         combined_loss, bce_loss, dice_loss = criterion(mask_logits.permute(1, 0, 2, 3), gt)
         combined_loss.backward()
         optimizer.step()
