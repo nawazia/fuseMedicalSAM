@@ -137,7 +137,6 @@ def fuse_multithread(models: list,
                      dataset: MiniMSAMDataset,
                      mask_path: str = "mask_logits",
                      save_path: str = "fused",
-                     colab: bool = False,
                      max_workers: int = None): # New parameter for number of threads
     '''
     For each mask:
@@ -194,7 +193,7 @@ def fuse_multithread(models: list,
 def fuse(models : list,
         dataset : MiniMSAMDataset,
         mask_path : str = "mask_logits",
-        save_path : str = "fused", colab = False):
+        save_path : str = "fused"):
     '''
     For each mask:
     1. Load .npz for models in models
@@ -245,7 +244,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     print(f"Models to be used: {models}")
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
 
-    fuse(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)#, max_workers=num_workers)
+    fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
     return
 
 
