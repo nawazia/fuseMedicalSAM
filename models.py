@@ -110,7 +110,7 @@ class SAM_Med2D(nn.Module):
         super().__init__()
         self.image_size = image_size
         self.model : Sam = sam_model_registry_sam_med2d[model_type](image_size, sam_checkpoint, encoder_adapter)
-        self.model.eval()
+        # self.model.eval()
     
     def forward(self, data):
         image = data["image"].float()
@@ -120,24 +120,23 @@ class SAM_Med2D(nn.Module):
         boxes[:, -2:] = boxes[:, -2:] + 1
         original_size = data["original_size"]
         
-        with torch.no_grad():
-            image_embeddings = self.model.image_encoder(image)
+        # with torch.no_grad():
+        image_embeddings = self.model.image_encoder(image)
 
         # masks, low_res_masks, iou_predictions = prompt_and_decoder(args, batched_input, model, image_embeddings)
-        with torch.no_grad():
-            sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
-                points=None,
-                boxes=boxes,
-                masks=None,
-            )
+        sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
+            points=None,
+            boxes=boxes,
+            masks=None,
+        )
 
-            low_res_masks, iou_predictions = self.model.mask_decoder(
-                image_embeddings = image_embeddings,
-                image_pe = self.model.prompt_encoder.get_dense_pe(),
-                sparse_prompt_embeddings=sparse_embeddings,
-                dense_prompt_embeddings=dense_embeddings,
-                multimask_output=False,
-            )
+        low_res_masks, iou_predictions = self.model.mask_decoder(
+            image_embeddings = image_embeddings,
+            image_pe = self.model.prompt_encoder.get_dense_pe(),
+            sparse_prompt_embeddings=sparse_embeddings,
+            dense_prompt_embeddings=dense_embeddings,
+            multimask_output=False,
+        )
         
         # interp masks to 256
         masks = interpolate(low_res_masks, (self.image_size, self.image_size), mode="bilinear", align_corners=False,)
