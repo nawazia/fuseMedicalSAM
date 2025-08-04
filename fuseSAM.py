@@ -241,14 +241,11 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
         # Generate mask logits
         mask_logits = model(data)                   # [4, 1, 208, 174]
         assert mask_logits.dim() == 4
-        print(f"mask_logits requires grad: {mask_logits.requires_grad}")
         gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
         # calculate losses
         optimizer.zero_grad()
         gt = gt.float()
         mask_logits = mask_logits.float()
-        print(gt)
-        print(mask_logits)
         combined_loss, bce_loss, dice_loss = criterion(mask_logits.permute(1, 0, 2, 3), gt)
         combined_loss.backward()
         optimizer.step()
@@ -257,7 +254,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
             'bce_loss': f'{bce_loss.item():.4f}',
             'dice_loss': f'{dice_loss.item():.4f}'
         })
-        break
+        
     pbar.close()
     print("Training complete!")
     return 0
