@@ -216,7 +216,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     # Fusion
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
     # Continual training
-    model = continual_training(target, dataset, fused_path)
+    model = continual_training(target, dataset, fused_path, device=device, num_workers=num_workers, colab=colab)
     return
 
 
