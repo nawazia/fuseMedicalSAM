@@ -2,6 +2,7 @@ import os
 import numpy as np
 
 def ImageLevelFusion(models, mask_path, mask_filename):
+    print(mask_filename)
     min_loss = np.inf
     data = (None, None)
     for model_name in models:
