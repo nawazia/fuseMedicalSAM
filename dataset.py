@@ -340,11 +340,8 @@ class MiniMSAMDataset(Dataset):
     def get_num_masks(self):
         return self.num_masks
     
-    def set_simple(self):
-        self.simple = True
-
-    def unset_simple(self):
-        self.simple = False
+    def set_simple(self, mode : bool):
+        self.simple = mode
 
     def __getitem__(self, idx):
         image_filename = self.image_paths[idx]
