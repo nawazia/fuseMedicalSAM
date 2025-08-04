@@ -13,6 +13,14 @@ from dataset import MiniMSAMDataset
 from models import load_model, calculate_segmentation_losses
 from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
 
+def count_files_scandir(directory_path):
+    count = 0
+    with os.scandir(directory_path) as entries:
+        for entry in entries:
+            if entry.is_file():
+                count += 1
+    return count
+
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
                               save_path : str = "mask_logits", device = "cpu", num_workers=0, colab = False):
@@ -47,7 +55,7 @@ def knowledge_externalization(models : list,
 
     for model_name in models:
         # check if all logits already exist
-        if len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) == num_masks:
+        if count_files_scandir(os.path.join(save_path, model_name)) == num_masks:
             print(f"All mask logits for {model_name} already exist, skipping model...")
             continue
         t = time.time()
