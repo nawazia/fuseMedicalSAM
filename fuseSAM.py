@@ -2,6 +2,7 @@ import argparse
 import os
 import glob
 import time
+from concurrent.futures import ThreadPoolExecutor
 import tqdm
 import cv2
 import numpy as np
@@ -108,6 +109,87 @@ def knowledge_externalization(models : list,
         print(f"Finished processing {model_name} in {time.time() - t:.2f} seconds")
     return save_path
 
+def process_single_mask_thread(models, mask_path, save_path, mask_filename, counts):
+    """
+    Function to process a single mask filename.
+    Designed to be run by a threading worker.
+    """
+    mask_save_path = os.path.join(save_path, f"{os.path.basename(mask_filename)[:-4]}_mask_logits")
+    
+    if os.path.exists(mask_save_path + ".npz"):
+        print(f"{mask_save_path}.npz already exists, skipping...")
+        return None # Indicate skipping
+
+    best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
+    print(f"Saving mask logits to: {mask_save_path}.npz")
+    np.savez_compressed(mask_save_path + ".npz", **best_data)
+    
+    # Update shared counts dictionary. No Manager needed for threads.
+    # If the update is not atomic (e.g., if you had a complex calculation for the new value),
+    # you might need a lock:
+    # with counts_lock:
+    counts[best_model] = counts.get(best_model, 0) + 1
+        
+    return best_model # Return info for main process if needed
+
+def fuse_multithread(models: list,
+                     dataset: MiniMSAMDataset,
+                     mask_path: str = "mask_logits",
+                     save_path: str = "fused",
+                     colab: bool = False,
+                     max_workers: int = None): # New parameter for number of threads
+    '''
+    For each mask:
+    1. Load .npz for models in models
+    2. Calculate fusion loss
+    3. Argmin, save to save_path
+
+    Parameters
+    ----------
+    models : list
+        List of SAM models to be used for fusion.
+    dataset : MiniMSAMDataset
+        Dataset for the dataset containing images.
+    mask_path : str
+        Path where the mask logits are be saved. Defaults to "mask_logits".
+    save_path : str
+        Path where the fused mask_logits will be saved. Defaults to "fused".
+    colab : bool
+        Flag to indicate Colab use. Defaults to False.
+    max_workers : int, optional
+        Maximum number of threads to use. Defaults to min(32, os.cpu_count() + 4).
+
+    Returns
+    -------
+    None
+    '''
+    os.makedirs(save_path, exist_ok=True)
+    dataset.set_simple(True)
+    
+    counts = dict() # Regular dictionary for threads
+
+    if max_workers is None:
+        max_workers = min(32, os.cpu_count() + 4) # Common default for ThreadPoolExecutor
+
+    print(f"Using {max_workers} threads for fusion.")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for i, data in enumerate(dataset):
+            mask_filenames = data["mask_filenames"]
+            for mask_filename in mask_filenames:
+                future = executor.submit(process_single_mask_thread, models, mask_path, save_path, mask_filename, counts)
+                futures.append(future)
+
+        # Use tqdm to show progress as futures complete
+        for future in tqdm.tqdm(futures, total=len(futures)):
+            future.result() # Wait for each future to complete
+
+    print("Fusion complete. Model counts:")
+    print(counts)
+    dataset.set_simple(False)
+    return 0
+
 def fuse(models : list,
         dataset : MiniMSAMDataset,
         mask_path : str = "mask_logits",
@@ -140,7 +222,6 @@ def fuse(models : list,
     counts = dict()
     for i, data in enumerate(tqdm.tqdm(dataset)):
         mask_filenames = data["mask_filenames"]
-        print(mask_filenames)
         # load images from mask_path/model_name
         for mask_filename in mask_filenames:
             mask_save_path = os.path.join(save_path, f"{os.path.basename(mask_filename)[:-4]}_mask_logits")
@@ -163,7 +244,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     print(f"Models to be used: {models}")
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
 
-    fuse(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)
+    fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)
     return
 
 
