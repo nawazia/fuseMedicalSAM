@@ -260,7 +260,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
         
     pbar.close()
     print("Training complete!")
-    return 0
+    return model
 
 def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
