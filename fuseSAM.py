@@ -13,13 +13,6 @@ from dataset import MiniMSAMDataset
 from models import load_model, calculate_segmentation_losses
 from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
 
-def count_files_scandir(directory_path):
-    count = 0
-    with os.scandir(directory_path) as entries:
-        for entry in entries:
-            if entry.is_file():
-                count += 1
-    return count
 
 def knowledge_externalization(models : list,
                               dataset : MiniMSAMDataset,
@@ -55,7 +48,7 @@ def knowledge_externalization(models : list,
 
     for model_name in models:
         # check if all logits already exist
-        if count_files_scandir(os.path.join(save_path, model_name)) == num_masks:
+        if len(glob.glob(os.path.join(save_path, model_name))) == num_masks:
             print(f"All mask logits for {model_name} already exist, skipping model...")
             continue
         t = time.time()
@@ -142,14 +135,20 @@ def fuse(models : list,
     -------
     None
     '''
+    os.makedirs(save_path, exist_ok=True)
     dataset.set_simple()
     for i, data in enumerate(tqdm.tqdm(dataset)):
         mask_filenames = data["mask_filenames"]
         print(mask_filenames)
         # load images from mask_path/model_name
         for mask_filename in mask_filenames:
-            best_model, data = ImageLevelFusion(models, mask_path, mask_filename)
+            best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
+            mask_save_path = os.path.join(save_path, f"{mask_filename[:-4]}_mask_logits")
+            print(f"Saving mask logits to: {mask_save_path}")
+            np.savez_compressed(save_path + ".npz", **best_data)
             print(best_model)
+            test = np.load(save_path + ".npz")
+            print(test)
         break
     dataset.unset_simple()
     return 0
