@@ -244,7 +244,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     print(f"Models to be used: {models}")
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
 
-    fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab)
+    fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), colab=colab, max_workers=num_workers)
     return
 
 
