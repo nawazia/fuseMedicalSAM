@@ -8,11 +8,13 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from dataset import MiniMSAMDataset
 from models import load_model, calculate_segmentation_losses
 from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
+from fusion import CombinedLoss
 
 
 def knowledge_externalization(models : list,
@@ -68,7 +70,6 @@ def knowledge_externalization(models : list,
         print(f"Loaded model: {model_name}")
         loss = []
         for i, data in enumerate(tqdm.tqdm(dataloader)):
-            mask_filenames = data['mask_filenames']
             mask_filenames = [os.path.basename(f[0]) for f in data['mask_filenames']] # Flatten list of lists and get base filename
             all_logits_exist = True
             for mask_filename in mask_filenames:
@@ -86,9 +87,9 @@ def knowledge_externalization(models : list,
 
             # Generate mask logits
             # cv2.imwrite(f"img.tif", (data['image'].float().squeeze()[0].cpu().numpy()).astype(np.float32))
-            mask_logits = model(data)
+            mask_logits = model(data)               # [4, 1, 208, 174]
             assert mask_logits.dim() == 4
-            gt = data["original_masks"].to(device)
+            gt = data["original_masks"].to(device)  # [1, 4, 208, 174]
             # calculate losses
             dice, bce, iou = calculate_segmentation_losses(gt, mask_logits.permute(1, 0, 2, 3))
             loss.extend(bce)
@@ -221,16 +222,39 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
     '''
     dataset.set_transforms(target)
     model = load_model(target, device, colab)
+    model.train()
     if args.device == "mps":
         gpu_memory_bytes = torch.mps.current_allocated_memory()
     else:
         gpu_memory_bytes = torch.cuda.memory_allocated()
     print(f"VRAM memory allocated: {gpu_memory_bytes / (1024**2):.2f} MB")
     print(f"Loaded model: {target}")
+    optimizer = Adam(model.parameters(), lr=1e-4)
+    criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    for i, data in enumerate(tqdm.tqdm(dataloader)):
-        print(data)
+    pbar = tqdm.tqdm(dataloader, desc="Training")
+    for i, data in enumerate(pbar):
+        # mask_filenames = [os.path.basename(f[0]) for f in data['mask_filenames']] # Flatten list of lists and get base filename
+        data['image'] = data['image'].float().to(device)
+        data["boxes"] = data['boxes'].to(device)
+
+        # Generate mask logits
+        mask_logits = model(data)                   # [4, 1, 208, 174]
+        assert mask_logits.dim() == 4
+        gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
+        # calculate losses
+        optimizer.zero_grad()
+        combined_loss, bce_loss, dice_loss = criterion(mask_logits.permute(1, 0, 2, 3), gt)
+        combined_loss.backward()
+        optimizer.step()
+        pbar.set_postfix({
+            'total_loss': f'{combined_loss.item():.4f}',
+            'bce_loss': f'{bce_loss.item():.4f}',
+            'dice_loss': f'{dice_loss.item():.4f}'
+        })
         break
+    pbar.close()
+    print("Training complete!")
     return 0
 
 def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
