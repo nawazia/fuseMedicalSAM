@@ -7,7 +7,6 @@ def ImageLevelFusion(models, mask_path, mask_filename):
     for model_name in models:
         mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
         cur = np.load(mask_path_full)
-        print(mask_path_full, cur.keys())
         dice = cur["dice_loss"]
         bce = cur["bce_loss"]
         loss = bce + dice
@@ -23,3 +22,6 @@ def RegionLevelFusion(models, mask_path):
 def UnsupervisedFusion(models, mask_path):
 
     return
+
+if __name__ == "__main__":
+    ImageLevelFusion(["MedSAM"], "/Users/i/ICL/fusion/code/data/17K/SAMed2Dv1/mask_logits/", "mr_00--AMOS2022--amos_0596--y_0081--0002_000.png")
