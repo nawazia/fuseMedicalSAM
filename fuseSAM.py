@@ -244,7 +244,6 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
         assert mask_logits.dim() == 4
         gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
         teacher_logits = data["teacher_logits"].to(device)
-        print(teacher_logits.shape)
         # calculate losses
         optimizer.zero_grad()
         gt = gt.float()
