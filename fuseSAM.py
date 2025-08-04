@@ -241,6 +241,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, fused_path : str
         # Generate mask logits
         mask_logits = model(data)                   # [4, 1, 208, 174]
         assert mask_logits.dim() == 4
+        print(f"mask_logits requires grad: {mask_logits.requires_grad}")
         gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
         # calculate losses
         optimizer.zero_grad()
