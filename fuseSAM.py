@@ -188,65 +188,21 @@ def fuse_multithread(models: list,
     print("Fusion complete. Model counts:")
     print(counts)
     dataset.set_simple(False)
-    return 0
-
-def fuse(models : list,
-        dataset : MiniMSAMDataset,
-        mask_path : str = "mask_logits",
-        save_path : str = "fused"):
-    '''
-    For each mask:
-    1. Load .npz for models in models
-    2. Calculate fusion loss
-    3. Argmin, save to save_path
-
-    Parameters
-    ----------
-    models : list
-        List of SAM models to be used for fusion.
-    dataset : MiniMSAMDataset
-        Dataset for the dataset containing images.
-    mask_path : str
-        Path where the mask logits are be saved. Defaults to "mask_logits".
-    save_path : str
-        Path where the fused mask_logits will be saved. Defaults to "fused".
-    colab : bool
-        Flag to indicate Colab use. Defaults to False.
-
-    Returns
-    -------
-    None
-    '''
-    os.makedirs(save_path, exist_ok=True)
-    dataset.set_simple(True)
-    counts = dict()
-    for i, data in enumerate(tqdm.tqdm(dataset)):
-        mask_filenames = data["mask_filenames"]
-        # load images from mask_path/model_name
-        for mask_filename in mask_filenames:
-            mask_save_path = os.path.join(save_path, f"{os.path.basename(mask_filename)[:-4]}_mask_logits")
-            if os.path.exists(mask_save_path + ".npz"):
-                print(mask_save_path + ".npz already exists, skipping...")
-                continue
-            best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
-            print(f"Saving mask logits to: {mask_save_path}.npz")
-            np.savez_compressed(mask_save_path + ".npz", **best_data)
-            counts[best_model] = counts.get(best_model, 0) + 1
-    
-    print(counts)
-    dataset.set_simple(False)
-    return 0
+    return save_path
 
 def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
+    # KE
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
-
-    fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
+    # Fusion
+    fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
+    # Target model
+    target = "SAM-Med2D"
+    # continual_training()
     return
-
 
 
 if __name__ == "__main__":
