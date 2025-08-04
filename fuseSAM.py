@@ -137,6 +137,7 @@ def fuse(models : list,
     '''
     os.makedirs(save_path, exist_ok=True)
     dataset.set_simple()
+    counts = dict()
     for i, data in enumerate(tqdm.tqdm(dataset)):
         mask_filenames = data["mask_filenames"]
         print(mask_filenames)
@@ -145,11 +146,10 @@ def fuse(models : list,
             best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
             mask_save_path = os.path.join(save_path, f"{mask_filename[:-4]}_mask_logits")
             print(f"Saving mask logits to: {mask_save_path}")
-            np.savez_compressed(save_path + ".npz", **best_data)
-            print(best_model)
-            test = np.load(save_path + ".npz")
-            print(test)
-        break
+            np.savez_compressed(mask_save_path + ".npz", **best_data)
+            counts[best_model] = counts.get(best_model, 0) + 1
+    
+    print(counts)
     dataset.unset_simple()
     return 0
 
