@@ -65,7 +65,7 @@ def knowledge_externalization(models : list,
         # For local paths, ensure the base directory exists
         os.makedirs(save_path, exist_ok=True)
 
-    num_images = len(dataset)
+    num_masks = dataset.get_num_masks()
 
     for model_name in models:
         # check if all logits already exist
@@ -73,13 +73,11 @@ def knowledge_externalization(models : list,
             model_blob_prefix = f"{blob_prefix}/{model_name}/"
             # List all objects under the model's prefix and check the count
             blob_list = list(bucket.list_blobs(prefix=model_blob_prefix))
-            print(model_blob_prefix)
-            print(blob_list)
-            if len(blob_list) == num_images:
+            if len(blob_list) == num_masks:
                 print(f"All mask logits for {model_name} already exist, skipping model...")
                 continue
         else:
-            if len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) == num_images:
+            if len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) == num_masks:
                 print(f"All mask logits for {model_name} already exist, skipping model...")
                 continue
         t = time.time()
@@ -99,18 +97,23 @@ def knowledge_externalization(models : list,
         print(f"Loaded model: {model_name}")
         loss = []
         for i, data in enumerate(tqdm.tqdm(dataloader)):
-            image_filename = os.path.basename(data['image_filename'][0])
-            print(image_filename)
-            if gcs:
-                blob_name = f"{blob_prefix}/{model_name}/{image_filename[:-4]}_mask_logits.npz"
-                if bucket.blob(blob_name).exists():
-                    print(f"Batched mask logits for {image_filename} already exist, skipping image...")
-                    continue
-            else:
-                expected_logit_path = os.path.join(save_path, model_name, f"{image_filename[:-4]}_mask_logits.npz")
-                if os.path.exists(expected_logit_path):
-                    print(f"Batched mask logits for {image_filename} already exist, skipping image...")
-                    continue
+            mask_filenames = [os.path.basename(f[0]) for f in data['mask_filenames']] # Flatten list of lists and get base filename
+            all_logits_exist = True
+            for mask_filename in mask_filenames:
+                if gcs:
+                    blob_name = f"{blob_prefix}/{model_name}/{mask_filename[:-4]}_mask_logits.npz"
+                    if not bucket.blob(blob_name).exists():
+                        all_logits_exist = False
+                        break
+                else:
+                    expected_logit_path = os.path.join(save_path, model_name, f"{mask_filename[:-4]}_mask_logits.npz")
+                    if not os.path.exists(expected_logit_path):
+                        all_logits_exist = False
+                        break
+
+            if all_logits_exist:
+                print(f"All mask logits for image associated with {mask_filenames[0]} already exist, skipping image...")
+                continue
 
             data['image'] = data['image'].to(device).float()
             data["boxes"] = data['boxes'].to(device)
@@ -126,25 +129,46 @@ def knowledge_externalization(models : list,
             # print(f"Mask logits shape: {mask_logits.shape}, dtype: {mask_logits.dtype}")
             # Save mask logits & losses
             mask_logits = mask_logits.squeeze(1).cpu().numpy()
-            mem_file = io.BytesIO()
-            np.savez_compressed(mem_file,
-                                mask_logits=mask_logits.astype(np.float32),
-                                dice_loss=np.array(dice, dtype=np.float32),
-                                bce_loss=np.array(bce, dtype=np.float32),
-                                iou_loss=np.array(iou, dtype=np.float32),
-                                )
-            mem_file.seek(0)
+            for j, mask_filename in enumerate(mask_filenames):
+                mem_file = io.BytesIO()
+                np.savez_compressed(mem_file,
+                                    mask_logits=mask_logits[j].astype(np.float32),
+                                    dice_loss=np.array(dice[j], dtype=np.float32),
+                                    bce_loss=np.array(bce[j], dtype=np.float32),
+                                    iou_loss=np.array(iou[j], dtype=np.float32),
+                                    )
+                mem_file.seek(0)  # Rewind the in-memory file to the beginning
+                
+                if gcs:
+                    blob_name = f"{blob_prefix}/{model_name}/{mask_filename[:-4]}_mask_logits.npz"
+                    print(f"Saving mask logits to GCS blob: {blob_name}")
+                    blob = bucket.blob(blob_name)
+                    blob.upload_from_file(mem_file, content_type='application/octet-stream')
+                else:
+                    mask_save_path = os.path.join(save_path, model_name, f"{mask_filename[:-4]}_mask_logits.npz")
+                    print(f"Saving mask logits to local file: {mask_save_path}")
+                    with open(mask_save_path, 'wb') as f:
+                        f.write(mem_file.getbuffer())
+
+            # mem_file = io.BytesIO()
+            # np.savez_compressed(mem_file,
+            #                     mask_logits=mask_logits.astype(np.float32),
+            #                     dice_loss=np.array(dice, dtype=np.float32),
+            #                     bce_loss=np.array(bce, dtype=np.float32),
+            #                     iou_loss=np.array(iou, dtype=np.float32),
+            #                     )
+            # mem_file.seek(0)
             
-            if gcs:
-                blob_name = f"{blob_prefix}/{model_name}/{image_filename[:-4]}_mask_logits.npz"
-                print(f"Saving batched mask logits to GCS blob: {blob_name}")
-                blob = bucket.blob(blob_name)
-                blob.upload_from_file(mem_file, content_type='application/octet-stream')
-            else:
-                mask_save_path = os.path.join(save_path, model_name, f"{image_filename[:-4]}_mask_logits.npz")
-                print(f"Saving batched mask logits to local file: {mask_save_path}")
-                with open(mask_save_path, 'wb') as f:
-                    f.write(mem_file.getbuffer())
+            # if gcs:
+            #     blob_name = f"{blob_prefix}/{model_name}/{image_filename[:-4]}_mask_logits.npz"
+            #     print(f"Saving batched mask logits to GCS blob: {blob_name}")
+            #     blob = bucket.blob(blob_name)
+            #     blob.upload_from_file(mem_file, content_type='application/octet-stream')
+            # else:
+            #     mask_save_path = os.path.join(save_path, model_name, f"{image_filename[:-4]}_mask_logits.npz")
+            #     print(f"Saving batched mask logits to local file: {mask_save_path}")
+            #     with open(mask_save_path, 'wb') as f:
+            #         f.write(mem_file.getbuffer())
                 # cv2.imwrite(mask_save_path + ".tif", (mask_logits[j]).astype(np.float32))
             if (i + 1) % 100 == 0:  # Print every 1000 iterations
                 print("Mean BCE loss:",np.mean(loss[-100:]))
