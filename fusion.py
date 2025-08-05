@@ -113,21 +113,27 @@ class CombinedLoss(nn.Module):
         self.dice_loss = DiceLoss()
         self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
         self.distillation_loss = DistillationLoss(temperature=temperature)
-        
+
         self.dice_weight = dice_weight
         self.bce_weight = bce_weight
         self.lambda_weight = lambda_weight
 
-    def forward(self, pred_logits, teacher_logits, ground_truth_masks):
+    def forward(self, pred_logits, ground_truth_masks, teacher_logits=None):
         dice_loss = self.dice_loss(pred_logits, ground_truth_masks)
         bce_loss = self.bce_loss(pred_logits, ground_truth_masks)
         
-        distillation_loss = self.distillation_loss(pred_logits, teacher_logits)
-        
-        combined_loss = self.lambda_weight * ((self.bce_weight * bce_loss) + (self.dice_weight * dice_loss)) + \
-                        ((1 - self.lambda_weight) * distillation_loss)  
-        
-        return combined_loss, bce_loss, dice_loss, distillation_loss
+        segmentation_loss = (self.bce_weight * bce_loss) + (self.dice_weight * dice_loss)
+        if teacher_logits is not None:
+            distillation_loss = self.distillation_loss(pred_logits, teacher_logits)
+            combined_loss = self.lambda_weight * segmentation_loss + \
+                            (1 - self.lambda_weight) * distillation_loss
+            
+            return combined_loss, bce_loss, dice_loss, distillation_loss
+        else:
+            # For validation/testing, there are no teacher logits.
+            # We return the segmentation loss as the primary metric.
+            return segmentation_loss, bce_loss, dice_loss, torch.tensor(0.0)
+
 
 if __name__ == "__main__":
     ImageLevelFusion(["MedSAM"], "/Users/i/ICL/fusion/code/data/17K/SAMed2Dv1/mask_logits/", "mr_00--AMOS2022--amos_0596--y_0081--0002_000.png")
