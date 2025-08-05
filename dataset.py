@@ -572,7 +572,7 @@ class MiniMSAMDatasetGCS(Dataset):
         if self.fused_path:
             all_mask_logits = []
             for mask_filename in mask_filenames:
-                npz_blob_name = os.path.join(self.fused_path, os.path.basename(mask_filename)[:-4]+"_mask_logits.npz")
+                npz_blob_name = os.path.join(self.data_path, self.fused_path, os.path.basename(mask_filename)[:-4]+"_mask_logits.npz")
                 print(npz_blob_name)
                 blob = self.bucket.blob(npz_blob_name)
                 with blob.open("rb") as f:

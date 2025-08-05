@@ -317,7 +317,7 @@ def fuse_multithread(models: list,
 
     print("Fusion complete. Model counts:")
     print(counts)
-    return save_path
+    return os.path.basename(save_path) if gcs else save_path
 
 def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
     '''
