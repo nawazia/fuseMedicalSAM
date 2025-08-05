@@ -232,6 +232,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     print(f"Loaded model: {target}")
     optimizer = Adam(model.parameters(), lr=1e-4)
     criterion = CombinedLoss()
+    num_workers = min(32, os.cpu_count() + 4) # A safe, robust value
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     
