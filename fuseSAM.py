@@ -269,9 +269,6 @@ def fuse_multithread(models: list,
         save_path_prefix = save_path_parts[1] if len(save_path_parts) > 1 else ""
         
         bucket = client.bucket(bucket_name)
-        print(bucket_name)
-        print(mask_path_prefix)
-        print(save_path_prefix)
     else:
         # Local filesystem mode
         os.makedirs(save_path, exist_ok=True)
@@ -447,6 +444,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     # Fusion
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), max_workers=num_workers, gcs=gcs)
     dataset.set_simple(False)
+    print(fused_path)
     # Continual training
     model = continual_training(target, dataset, test_dataset, fused_path, device=device, num_workers=num_workers, colab=colab)
     return
