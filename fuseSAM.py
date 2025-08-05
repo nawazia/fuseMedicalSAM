@@ -280,10 +280,18 @@ def fuse_multithread(models: list,
         if len(blob_list) == num_masks:
             print(f"All fused mask logits already exist, skipping...")
             return save_path
+        elif len(blob_list) > num_masks:
+            raise TypeError(f"more files than masks: {len(blob_list)} files and {num_masks} masks")
+        else:
+            print(f"Found {len(blob_list)} out of {num_masks}")
     else:
         if len(glob.glob(os.path.join(save_path, "*.npz"))) == num_masks:
             print(f"All fused mask logits already exist, skipping...")
             return save_path
+        elif len(glob.glob(os.path.join(save_path, "*.npz"))) > num_masks:
+            raise TypeError(f"more files than masks: {len(glob.glob(os.path.join(save_path, '*.npz')))} files and {num_masks} masks")
+        else:
+            print(f"Found {len(glob.glob(os.path.join(save_path, '*.npz')))} out of {num_masks}")
     
     counts = dict() # Regular dictionary for threads
 
