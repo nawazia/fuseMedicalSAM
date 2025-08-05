@@ -533,7 +533,6 @@ class MiniMSAMDatasetGCS(Dataset):
         masks = []
         for mask_path in mask_paths_full:
             # mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
-            print(mask_path)
             mask = self._read_image_from_gcs(mask_path)
             mask = (mask > 0).astype(np.uint8)
             masks.append(mask)
@@ -573,7 +572,6 @@ class MiniMSAMDatasetGCS(Dataset):
             all_mask_logits = []
             for mask_filename in mask_filenames:
                 npz_blob_name = os.path.join(self.data_path, self.fused_path, os.path.basename(mask_filename)[:-4]+"_mask_logits.npz")
-                print(npz_blob_name)
                 blob = self.bucket.blob(npz_blob_name)
                 with blob.open("rb") as f:
                     npz_data = np.load(io.BytesIO(f.read()))
