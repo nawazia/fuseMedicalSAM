@@ -372,6 +372,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
             mask_logits = model(data)                   # [4, 1, 208, 174]
             assert mask_logits.dim() == 4
             gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
+            print("here")
             teacher_logits = data["teacher_logits"].to(device)
             # calculate losses
             optimizer.zero_grad()
