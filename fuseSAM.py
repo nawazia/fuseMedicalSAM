@@ -269,6 +269,9 @@ def fuse_multithread(models: list,
         save_path_prefix = save_path_parts[1] if len(save_path_parts) > 1 else ""
         
         bucket = client.bucket(bucket_name)
+        print(bucket_name)
+        print(mask_path_prefix)
+        print(save_path_prefix)
     else:
         # Local filesystem mode
         os.makedirs(save_path, exist_ok=True)
