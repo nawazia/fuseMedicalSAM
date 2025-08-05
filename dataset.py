@@ -533,6 +533,7 @@ class MiniMSAMDatasetGCS(Dataset):
         masks = []
         for mask_path in mask_paths_full:
             # mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+            print(mask_path)
             mask = self._read_image_from_gcs(mask_path)
             mask = (mask > 0).astype(np.uint8)
             masks.append(mask)
