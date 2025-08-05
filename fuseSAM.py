@@ -77,7 +77,7 @@ def knowledge_externalization(models : list,
                 print(f"All mask logits for {model_name} already exist, skipping model...")
                 continue
             elif len(blob_list) > num_masks:
-                raise ValueError()
+                raise TypeError(f"more files than masks: {len(blob_list)} files and {num_masks} masks")
             else:
                 print(f"Found {len(blob_list)} out of {num_masks}")
         else:
@@ -85,7 +85,7 @@ def knowledge_externalization(models : list,
                 print(f"All mask logits for {model_name} already exist, skipping model...")
                 continue
             elif len(glob.glob(os.path.join(save_path, model_name, "*.npz"))) > num_masks:
-                raise ValueError()
+                raise TypeError(f"more files than masks: {len(glob.glob(os.path.join(save_path, model_name, '*.npz')))} files and {num_masks} masks")
             else:
                 print(f"Found {len(glob.glob(os.path.join(save_path, model_name, '*.npz')))} out of {num_masks}")
         t = time.time()
