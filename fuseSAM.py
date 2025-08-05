@@ -445,7 +445,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
         save_path = os.path.join(data_path, "mask_logits")
     mask_path = knowledge_externalization(models, dataset, save_path=save_path, device=device, num_workers=num_workers, colab=colab, gcs=gcs)
     # Fusion
-    fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), max_workers=num_workers)
+    fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), max_workers=num_workers, gcs=gcs)
     dataset.set_simple(False)
     # Continual training
     model = continual_training(target, dataset, test_dataset, fused_path, device=device, num_workers=num_workers, colab=colab)
