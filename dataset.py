@@ -603,6 +603,8 @@ if __name__ == "__main__":
         [print(box) for box in boxes]
         masks = data['masks']
         [print(mask.shape) for mask in masks]
+        image_filename = data['image_filename']
+        print(image_filename)
         mask_filenames = data['mask_filenames']
         print(mask_filenames)
         original_size = data["original_size"]

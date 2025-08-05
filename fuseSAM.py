@@ -96,7 +96,7 @@ def knowledge_externalization(models : list,
         print(f"Loaded model: {model_name}")
         loss = []
         for i, data in enumerate(tqdm.tqdm(dataloader)):
-            image_filename = os.path.basename(data['image_filename'])
+            image_filename = os.path.basename(data['image_filename'][0])
             print(image_filename)
             if gcs:
                 blob_name = f"{blob_prefix}/{model_name}/{image_filename[:-4]}_mask_logits.npz"
