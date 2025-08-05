@@ -72,6 +72,7 @@ def knowledge_externalization(models : list,
             model_blob_prefix = f"{blob_prefix}/{model_name}/"
             # List all objects under the model's prefix and check the count
             blob_list = list(bucket.list_blobs(prefix=model_blob_prefix))
+            print(model_blob_prefix)
             if len(blob_list) == num_images:
                 print(f"All mask logits for {model_name} already exist, skipping model...")
                 continue
