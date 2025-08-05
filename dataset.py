@@ -1,12 +1,14 @@
 import json
 import os
 import copy
+import io
 
 import numpy as np
 import cv2
 from torch.utils.data import Dataset
 import torch
 import albumentations as A
+from google.cloud import storage
 from albumentations.core.transforms_interface import ImageOnlyTransform
 
 
@@ -410,6 +412,170 @@ class MiniMSAMDataset(Dataset):
             for npz_path in fused_paths_full:
                 with np.load(npz_path) as data:
                     mask_logits = data['mask_logits']
+                    all_mask_logits.append(mask_logits)
+            # The final shape will be (num_masks, H, W)
+            stacked_logits = torch.from_numpy(np.stack(all_mask_logits, axis=0)).float()
+            sample['teacher_logits'] = stacked_logits
+        return sample
+    
+class MiniMSAMDatasetGCS(Dataset):
+    def __init__(self, gcs_bucket_name, data_path, json_path, split="train"):
+        """
+        Args:
+            gcs_bucket_name (str): The name of your GCS bucket.
+            json_path (str): Path to the JSON file containing image-mask pairs.
+        """
+        # --- GCS client setup ---
+        # The client will use the credentials authenticated in Colab
+        self.client = storage.Client()
+        self.bucket = self.client.bucket(gcs_bucket_name)
+        self.data_path = data_path
+        self.json_path = json_path
+        blob = self.bucket.blob(json_path)
+        json_data_bytes = blob.download_as_bytes()
+        json_data = json.loads(json_data_bytes)
+        
+        self.data = json_data[split]
+        self.image_paths = list(self.data.keys())
+        self.num_masks = sum(len(masks) for masks in self.data.values())
+        self.simple = False
+        self.fused_path = None  # Note: fused_path would also need to be a GCS path
+
+    def set_transforms(self, model : str = None):
+        """ Set the transformation pipeline based on the model type.
+        Args:
+            model (str): Model type to determine the transformation pipeline.
+        """
+        self.model = model
+
+        if model is not None and model not in ["MedSAM", "SAM4Med", "SAM-Med2D"]:#, "Med-SA"]:
+            raise ValueError(f"Default model type '{model}' not in model_types")
+        
+        transforms = []
+        
+        if model == "MedSAM":
+            transforms.extend([
+                A.Resize(1024, 1024, cv2.INTER_CUBIC),
+                A.Normalize(normalization="min_max", p=1.0),
+            ])
+        if model == "LiteMedSAM":
+            transforms.extend([ClipNorm(p=1.0),
+                A.Normalize(normalization="min_max", p=1.0),
+                A.LongestMaxSize(256),
+                PadBottomRightOnly(target_size=256, p=1.0)])
+        elif model == "SAM4Med":
+            transforms.extend(
+                [ClipNorm(p=1.0),
+                A.LongestMaxSize(1024),
+                CustomNormalize(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], max_pixel_value=255.0, p=1.0),
+                PadBottomRightOnly(target_size=1024, p=1.0)])
+        elif model == "SAM-Med2D":
+            transforms.extend([
+                CustomNormalize(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], max_pixel_value=255.0, p=1.0),
+                # train_transforms() here
+                ConditionalPadOrResize(
+                    target_size=256,
+                    resize_interpolation=cv2.INTER_NEAREST,
+                    pad_border_mode=cv2.BORDER_CONSTANT,
+                    pad_value=0,
+                    pad_mask_value=0,
+                    p=1.0
+                ),
+                ])
+
+        transforms.append(A.ToTensorV2(p=1.0))  # Always convert to tensor at the end
+        self.transform = A.Compose(
+            transforms,
+            p=1.0)
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_num_masks(self):
+        return self.num_masks
+    
+    def set_simple(self, mode : bool):
+        self.simple = mode
+
+    def set_fused(self, path : str):
+        self.fused_path = path
+
+    def _read_image_from_gcs(self, blob_name):
+        """Helper to read an image from GCS and return it as a numpy array."""
+        blob = self.bucket.blob(blob_name)
+        image_bytes = blob.download_as_bytes()
+        # Decode the bytes into a numpy array
+        image_array = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(image_array, cv2.IMREAD_UNCHANGED)
+        return img
+
+    def __getitem__(self, idx):
+        image_filename = self.image_paths[idx]
+        mask_filenames = self.data[image_filename]
+        if self.simple:
+            sample = {
+                'image_filename': image_filename,
+                'mask_filenames': mask_filenames
+            }
+            return sample
+        image_path_full = os.path.join(self.data_path, image_filename)
+        mask_paths_full = [os.path.join(self.data_path, mask_filename) for mask_filename in mask_filenames]
+
+        # Load the image
+        # img = cv2.imread(image_path_full, cv2.IMREAD_UNCHANGED)
+        img = self._read_image_from_gcs(image_path_full)
+        original_size = img.shape[:2]  # (height, width)
+        if len(img.shape) == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        assert img.shape[2] == 3, "Image must have 3 channels (RGB)"
+
+        # Load the masks, assuming they're grayscale
+        masks = []
+        for mask_path in mask_paths_full:
+            # mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+            mask = self._read_image_from_gcs(mask_path)
+            mask = (mask > 0).astype(np.uint8)
+            masks.append(mask)
+            assert len(mask.shape) == 2, "Mask must be a single-channel image"
+            assert mask.shape[:2] == img.shape[:2], "Mask shape {} does not match image shape: {}".format(mask.shape, img.shape)
+        
+        original_masks = np.array(masks)
+        transformed_data = self.transform(image=img, masks=masks)
+        img = transformed_data['image']
+        # print(img.shape, img.min(), img.max(), img.mean(), img.std())
+        new_size = list(img.shape[-2:])
+
+        # find pre-pad size
+        scale = max(new_size) * 1.0 / max(original_size)
+        newh, neww = original_size[0] * scale, original_size[1] * scale
+        newh, neww = int(newh + 0.5), int(neww + 0.5)
+
+        masks = transformed_data['masks']
+
+        boxes = []
+        for mask in masks:
+            boxes.append(find_box_from_mask(mask.numpy()))
+        boxes = torch.tensor(boxes, dtype=torch.float32)
+
+        sample = {
+            'image': img,
+            'boxes': boxes,
+            'masks': masks,
+            'original_masks': original_masks,
+            'original_size': original_size,
+            'prepad_size': (newh, neww),
+            'image_filename': image_filename,
+            'mask_filenames': mask_filenames
+        }
+
+        if self.fused_path:
+            all_mask_logits = []
+            for mask_filename in mask_filenames:
+                npz_blob_name = os.path.join(self.fused_path, os.path.basename(mask_filename)[:-4]+"_mask_logits.npz")
+                blob = self.bucket.blob(npz_blob_name)
+                with blob.open("rb") as f:
+                    npz_data = np.load(io.BytesIO(f.read()))
+                    mask_logits = npz_data['mask_logits']
                     all_mask_logits.append(mask_logits)
             # The final shape will be (num_masks, H, W)
             stacked_logits = torch.from_numpy(np.stack(all_mask_logits, axis=0)).float()

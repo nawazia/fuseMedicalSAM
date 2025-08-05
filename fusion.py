@@ -1,4 +1,5 @@
 import os
+import io
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,6 +15,57 @@ def ImageLevelFusion(models, mask_path, mask_filename):
         loss = bce + dice
         if loss < min_loss:
             data = (model_name, cur)
+
+    return data
+
+def ImageLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename):
+    """
+    Finds the best model for a given mask by loading logits from a GCS bucket.
+
+    Parameters
+    ----------
+    models : list
+        List of SAM models to be used for fusion.
+    bucket : google.cloud.storage.bucket.Bucket
+        The GCS bucket object.
+    mask_path_prefix : str
+        The GCS path prefix to the model logits folder.
+    mask_filename : str
+        The base filename of the mask to load.
+
+    Returns
+    -------
+    data : tuple
+        A tuple containing the best model name and the loaded data.
+    """
+    min_loss = np.inf
+    data = (None, None)
+    
+    for model_name in models:
+        # Construct the GCS blob name
+        npz_blob_name = f"{mask_path_prefix}/{model_name}/{os.path.basename(mask_filename)[:-4]}_mask_logits.npz"
+        
+        try:
+            # Get the blob and download its content into a BytesIO buffer
+            blob = bucket.blob(npz_blob_name)
+            npz_data_bytes = blob.download_as_bytes()
+            mem_file = io.BytesIO(npz_data_bytes)
+            
+            # Load the data from the in-memory buffer
+            cur = np.load(mem_file)
+            
+            dice = cur["dice_loss"]
+            bce = cur["bce_loss"]
+            loss = bce + dice
+            
+            if loss < min_loss:
+                min_loss = loss
+                data = (model_name, cur)
+
+        except Exception as e:
+            # Handle cases where the file might not exist for a given model
+            print(f"Error loading {npz_blob_name}: {e}")
+            continue
 
     return data
 
@@ -121,7 +173,7 @@ class CombinedLoss(nn.Module):
     def forward(self, pred_logits, ground_truth_masks, teacher_logits=None):
         dice_loss = self.dice_loss(pred_logits, ground_truth_masks)
         bce_loss = self.bce_loss(pred_logits, ground_truth_masks)
-        
+
         segmentation_loss = (self.bce_weight * bce_loss) + (self.dice_weight * dice_loss)
         if teacher_logits is not None:
             distillation_loss = self.distillation_loss(pred_logits, teacher_logits)
