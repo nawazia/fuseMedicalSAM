@@ -196,6 +196,41 @@ def fuse_multithread(models: list,
     print(counts)
     return save_path
 
+def eval_post_epoch(model, test_dataloader, criterion, device):
+    model.eval()
+    test_losses = []
+    test_bce_losses = []
+    test_dice_losses = []
+
+    pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
+    with torch.no_grad():
+        for data in pbar_test:
+            data['image'] = data['image'].to(device).float()
+            data["boxes"] = data['boxes'].to(device)
+            gt = data["original_masks"].to(device)
+            mask_logits = model(data)
+            mask_logits = mask_logits.permute(1, 0, 2, 3) 
+
+            gt = gt.float()
+            mask_logits = mask_logits.float()
+            combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
+
+            test_losses.append(combined_loss.item())
+            test_bce_losses.append(bce_loss.item())
+            test_dice_losses.append(dice_loss.item())
+            
+            pbar_test.set_postfix({
+                'test_loss': f'{combined_loss.item():.4f}',
+            })
+
+    pbar_test.close()
+    avg_val_loss = sum(test_losses) / len(test_losses)
+    avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
+    avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
+    
+    print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
+    return
+
 def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
     '''
     1. Load target model in train mode.
@@ -234,7 +269,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    
+    eval_post_epoch(model, test_dataloader, criterion, device)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
 
@@ -264,39 +299,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
                 'distillation_loss': f'{distillation_loss.item():.4f}'
             })
         pbar_train.close()
-
-        model.eval()
-        test_losses = []
-        test_bce_losses = []
-        test_dice_losses = []
-
-        pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
-        with torch.no_grad():
-            for data in pbar_test:
-                data['image'] = data['image'].to(device).float()
-                data["boxes"] = data['boxes'].to(device)
-                gt = data["original_masks"].to(device)
-                mask_logits = model(data)
-                mask_logits = mask_logits.permute(1, 0, 2, 3) 
-
-                gt = gt.float()
-                mask_logits = mask_logits.float()
-                combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
-
-                test_losses.append(combined_loss.item())
-                test_bce_losses.append(bce_loss.item())
-                test_dice_losses.append(dice_loss.item())
-                
-                pbar_test.set_postfix({
-                    'test_loss': f'{combined_loss.item():.4f}',
-                })
-
-        pbar_test.close()
-        avg_val_loss = sum(test_losses) / len(test_losses)
-        avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
-        avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
-        
-        print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
+        eval_post_epoch(model, test_dataloader, criterion, device)
     
     print("Training complete!")
     return model
