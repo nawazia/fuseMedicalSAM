@@ -124,6 +124,7 @@ def process_single_mask_thread(models, mask_path, save_path, mask_filename, coun
         return None # Indicate skipping
 
     best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
+    assert isinstance(best_data["mask_logits"], np.ndarray), mask_filename
     print(f"Saving mask logits to: {mask_save_path}.npz")
     np.savez_compressed(mask_save_path + ".npz", **best_data)
     
