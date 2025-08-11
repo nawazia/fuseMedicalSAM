@@ -205,7 +205,7 @@ def process_single_mask_thread(models, bucket, mask_path_prefix, save_path_prefi
         best_model, best_data = ImageLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename)
     else:
         best_model, best_data = ImageLevelFusion(models, mask_path_prefix, mask_filename)
-    
+    assert isinstance(best_data["mask_logits"], np.ndarray), mask_filename
     print(f"Saving fused logits to GCS blob: {mask_save_blob_name}")
     
     # Save the data to an in-memory buffer, then upload to GCS
