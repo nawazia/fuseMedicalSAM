@@ -289,6 +289,7 @@ class MiniMSAMDataset(Dataset):
             self.num_masks += len(masks)
         self.simple = False
         self.fused_path = None
+        self.debug = False
 
     def set_transforms(self, model : str = None):
         """ Set the transformation pipeline based on the model type.
@@ -348,10 +349,15 @@ class MiniMSAMDataset(Dataset):
 
     def set_fused(self, path : str):
         self.fused_path = path
+    
+    def set_debug(self, mode : bool):
+        self.debug = mode
 
     def __getitem__(self, idx):
         image_filename = self.image_paths[idx]
         mask_filenames = self.data[image_filename]
+        if self.debug:
+            print("image_filename:", image_filename)
         if self.simple:
             sample = {
                 'image_filename': image_filename,
@@ -440,6 +446,7 @@ class MiniMSAMDatasetGCS(Dataset):
         self.num_masks = sum(len(masks) for masks in self.data.values())
         self.simple = False
         self.fused_path = None  # Note: fused_path would also need to be a GCS path
+        self.debug = False
 
     def set_transforms(self, model : str = None):
         """ Set the transformation pipeline based on the model type.
@@ -500,6 +507,9 @@ class MiniMSAMDatasetGCS(Dataset):
     def set_fused(self, path : str):
         self.fused_path = path
 
+    def set_debug(self, mode : bool):
+        self.debug = mode
+
     def _read_image_from_gcs(self, blob_name):
         """Helper to read an image from GCS and return it as a numpy array."""
         blob = self.bucket.blob(blob_name)
@@ -512,6 +522,8 @@ class MiniMSAMDatasetGCS(Dataset):
     def __getitem__(self, idx):
         image_filename = self.image_paths[idx]
         mask_filenames = self.data[image_filename]
+        if self.debug:
+            print("image_filename:", image_filename)
         if self.simple:
             sample = {
                 'image_filename': image_filename,
