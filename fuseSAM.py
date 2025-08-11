@@ -95,7 +95,7 @@ def knowledge_externalization(models : list,
             loss.extend(bce)
             # print(f"Mask logits shape: {mask_logits.shape}, dtype: {mask_logits.dtype}")
             # Save mask logits & losses
-            mask_logits = mask_logits.squeeze(1).cpu().numpy()
+            mask_logits = mask_logits.squeeze(1).cpu().detach().numpy()
             for j, mask_filename in enumerate(mask_filenames):
                 mask_save_path = os.path.join(save_path, model_name, f"{mask_filename[:-4]}_mask_logits")
                 print(f"Saving mask logits to: {mask_save_path}")
