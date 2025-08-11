@@ -381,7 +381,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     None
     '''
     dataset.set_transforms(target)
-    dataset.set_debug(True)
+    dataset.set_debug(debug)
     test_dataset.set_transforms(target)
     dataset.set_fused(fused_path)
     model = load_model(target, device, colab)
