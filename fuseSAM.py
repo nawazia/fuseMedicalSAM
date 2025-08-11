@@ -319,7 +319,7 @@ def fuse_multithread(models: list,
     print(counts)
     return save_path
 
-def eval_post_epoch(model, test_dataloader, criterion, device):
+def eval_post_epoch(model, test_dataloader, criterion, device, debug=False):
     model.eval()
     test_losses = []
     test_bce_losses = []
@@ -328,6 +328,8 @@ def eval_post_epoch(model, test_dataloader, criterion, device):
     pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
     with torch.no_grad():
         for data in pbar_test:
+            if debug:
+                print("image:", data["image_filename"])
             data['image'] = data['image'].to(device).float()
             data["boxes"] = data['boxes'].to(device)
             gt = data["original_masks"].to(device)
@@ -354,7 +356,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device):
     print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
     return
 
-def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
+def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
     '''
     1. Load target model in train mode.
 
@@ -392,13 +394,15 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    eval_post_epoch(model, test_dataloader, criterion, device)
+    eval_post_epoch(model, test_dataloader, criterion, device, debug)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
 
         model.train()
         pbar_train = tqdm.tqdm(dataloader, desc="Training")
         for i, data in enumerate(pbar_train):
+            if debug:
+                print("image:", data["image_filename"])
             # mask_filenames = [os.path.basename(f[0]) for f in data['mask_filenames']] # Flatten list of lists and get base filename
             data['image'] = data['image'].to(device).float()
             data["boxes"] = data['boxes'].to(device)
@@ -427,7 +431,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     print("Training complete!")
     return model
 
-def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False, gcs=False):
+def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False, gcs=False, debug=False):
     if gcs:
         dataset = MiniMSAMDatasetGCS("sam-med2d-17k", data_path, json_path, "train")
         test_dataset = MiniMSAMDatasetGCS("sam-med2d-17k", data_path, json_path, "test")
@@ -448,7 +452,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), max_workers=num_workers, gcs=gcs)
     dataset.set_simple(False)
     # Continual training
-    model = continual_training(target, dataset, test_dataset, "fused", device=device, num_workers=num_workers, colab=colab)
+    model = continual_training(target, dataset, test_dataset, "fused", device=device, num_workers=num_workers, colab=colab, debug=debug)
     return
 
 
@@ -460,6 +464,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
     parser.add_argument("--colab", action="store_true", help="Load models from Colab (default: False)")
     parser.add_argument("--gcs", action="store_true", help="Run on GCS bucket, sam-med2d-17k (default: False)")
+    parser.add_argument("--debug", action="store_true", help="Debug mode (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, num_workers=args.num_workers, colab=args.colab, gcs=args.gcs)
+    main(args.data_path, args.json_path, device=args.device, num_workers=args.num_workers, colab=args.colab, gcs=args.gcs, debug=args.debug)
