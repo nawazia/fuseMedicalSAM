@@ -79,7 +79,7 @@ def knowledge_externalization(models : list,
                     break # No need to check further for this image
 
             if all_logits_exist:
-                print(f"All mask logits for image associated with {data["image_filename"]} already exist, skipping image...")
+                print(f"All mask logits for image associated with {data['image_filename']} already exist, skipping image...")
                 continue
 
             data['image'] = data['image'].float().to(device)
