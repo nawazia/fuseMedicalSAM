@@ -244,11 +244,11 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
             if organ_info:
                 batch_dice = criterion2(mask_logits, gt)
                 batch_dice = batch_dice.flatten().tolist()
-                for mask_filename in data["mask_filenames"]:
+                for j, mask_filename in enumerate(data["mask_filenames"]):
                     mask_info = os.path.basename(mask_filename[0])[:-4].split("--")
                     organ = mapping[dataset][mask_info[4].split('_')[0]]
                     oscores = organ_dice.get(organ, [])
-                    oscores.append(batch_dice)
+                    oscores.append(batch_dice[j])
                     organ_dice[organ] = oscores
             combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
 
@@ -286,8 +286,6 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
 
         if organ_info:
             print("---Organ Scores---")
-            for org, scores in organ_dice.items():
-                print(f"{org}: {np.mean(scores)}")
             for org, scores in sorted(organ_dice.items(), key=lambda item: 1 - np.mean(item[1])):
                 print(f"{org}: {1 - np.mean(scores)}")
     return
