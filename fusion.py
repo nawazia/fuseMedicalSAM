@@ -42,7 +42,7 @@ def ImageLevelFusion(models, bucket, mask_path_prefix, mask_filename):
             
             dice = cur["dice_loss"]
             bce = cur["bce_loss"]
-            loss = bce + dice
+            loss = bce.mean() + dice
             
             if loss < min_loss:
                 min_loss = loss
@@ -149,9 +149,64 @@ def RegionLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename):
     result["mask_logits"] = comp_mask
     return ("Composite", result)
 
-def UnsupervisedFusion(models, mask_path):
+def UnsupervisedFusion(models, mask_path, mask_filename):
+    max_iou = 0
+    data = (None, None)
+    for model_name in models:
+        mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
+        cur = np.load(mask_path_full)
+        iou_preds = cur["iou_preds"]
+        if iou_preds > max_iou:
+            data = (model_name, cur)
 
-    return
+    return data
+
+def UnsupervisedFusionGCS(models, bucket, mask_path_prefix, mask_filename):
+    """
+    Finds the best model for a given mask by loading logits from a GCS bucket.
+
+    Parameters
+    ----------
+    models : list
+        List of SAM models to be used for fusion.
+    bucket : google.cloud.storage.bucket.Bucket
+        The GCS bucket object.
+    mask_path_prefix : str
+        The GCS path prefix to the model logits folder.
+    mask_filename : str
+        The base filename of the mask to load.
+
+    Returns
+    -------
+    data : tuple
+        A tuple containing the best model name and the loaded data.
+    """
+    max_iou = 0
+    data = (None, None)
+    
+    for model_name in models:
+        # Construct the GCS blob name
+        npz_blob_name = f"{mask_path_prefix}/{model_name}/{os.path.basename(mask_filename)[:-4]}_mask_logits.npz"
+        
+        try:
+            # Get the blob and download its content into a BytesIO buffer
+            blob = bucket.blob(npz_blob_name)
+            npz_data_bytes = blob.download_as_bytes()
+            mem_file = io.BytesIO(npz_data_bytes)
+            
+            # Load the data from the in-memory buffer
+            cur = np.load(mem_file)
+            
+            iou_preds = cur["iou_preds"]
+            if iou_preds > max_iou:
+                data = (model_name, cur)
+
+        except Exception as e:
+            # Handle cases where the file might not exist for a given model
+            print(f"Error loading {npz_blob_name}: {e}")
+            continue
+
+    return data
 
 class DiceLoss(nn.Module):
     def __init__(self, smooth=1.0):

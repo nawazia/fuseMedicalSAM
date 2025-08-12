@@ -35,7 +35,7 @@ class LiteMedSAM(nn.Module):
             medsam_mask, iou_pred = self.inference(self.medsam_lite, image_embedding, box, (newh, neww), (H, W), return_logits=True)
             segs[idx] = medsam_mask
 
-        return segs
+        return segs, iou_pred
     
 class MedSAM(nn.Module):
     def __init__(self, model_type: str = "vit_b", image_size : int = 1024, sam_checkpoint: str = None):
@@ -59,7 +59,7 @@ class MedSAM(nn.Module):
             boxes = boxes[:, None, :]  # (B, 1, 4)
 
         medsam_mask, iou_pred = self.inference(self.medsam, image_embedding, boxes, H, W, return_logits=True)
-        return medsam_mask
+        return medsam_mask, iou_pred
     
     
 class SAM4Med(nn.Module):
@@ -94,7 +94,7 @@ class SAM4Med(nn.Module):
             boxes = boxes.unsqueeze(0)
             
         '''box'''
-        masks, _, _ = self.sam4med.predict_torch(
+        masks, iou_preds, _ = self.sam4med.predict_torch(
             point_coords=None,
             point_labels=None,
             boxes = boxes,
@@ -103,7 +103,7 @@ class SAM4Med(nn.Module):
             ) # Mask -> N,M,H,W
         
         # masks = masks.squeeze(1).cpu().numpy()
-        return masks
+        return masks, iou_preds
     
 class SAM_Med2D(nn.Module):
     def __init__(self, model_type: str = "vit_b", image_size : int = 256, sam_checkpoint: str = None, encoder_adapter: bool = True):
@@ -151,7 +151,7 @@ class SAM_Med2D(nn.Module):
             masks = interpolate(masks, original_size, mode="bilinear", align_corners=False)
 
         # masks = masks.squeeze(1).cpu().numpy()
-        return masks
+        return masks, iou_predictions
 
 def load_model(model_name: str, device='cpu', colab=False):
     """
@@ -287,13 +287,14 @@ def calculate_segmentation_losses(gt_masks, mask_logits):
     # The output shape will be [B, C, H, W]
     bce_loss_fn = nn.BCEWithLogitsLoss(reduction='none')
     bce_pixel_losses = bce_loss_fn(mask_logits, gt_masks)
+    bce_pixel_losses_numpy = bce_pixel_losses.squeeze().detach().cpu().numpy()
 
-    # To get a single BCE loss value per mask (channel), average over H and W
-    # The result will be shape [B, C]
-    bce_losses_per_mask_tensor = bce_pixel_losses.mean(dim=(-1, -2)) # Average over H and W
+    # # To get a single BCE loss value per mask (channel), average over H and W
+    # # The result will be shape [B, C]
+    # bce_losses_per_mask_tensor = bce_pixel_losses.mean(dim=(-1, -2)) # Average over H and W
 
-    # Convert to a list of individual loss values (flattened Bx_C_ list)
-    bce_losses_list = bce_losses_per_mask_tensor.flatten().tolist()
+    # # Convert to a list of individual loss values (flattened Bx_C_ list)
+    # bce_losses_list = bce_losses_per_mask_tensor.flatten().tolist()
 
 
     # --- 2. Calculate Dice & IoU Loss ---
@@ -344,4 +345,4 @@ def calculate_segmentation_losses(gt_masks, mask_logits):
             iou_losses_list.append(iou_loss_val.item())
 
     # Return lists of individual scalar losses
-    return dice_losses_list, bce_losses_list, iou_losses_list
+    return dice_losses_list, bce_pixel_losses_numpy, iou_losses_list

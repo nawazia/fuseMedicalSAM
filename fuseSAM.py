@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 
 from dataset import MiniMSAMDataset
 from models import load_model, calculate_segmentation_losses
-from fusion import ImageLevelFusion, RegionLevelFusionGCS, UnsupervisedFusion
+from fusion import ImageLevelFusion, RegionLevelFusionGCS, UnsupervisedFusionGCS
 from fusion import CombinedLoss
 
 
@@ -108,19 +108,21 @@ def knowledge_externalization(models : list,
 
             # Generate mask logits
             # cv2.imwrite(f"img.tif", (data['image'].float().squeeze()[0].cpu().numpy()).astype(np.float32))
-            mask_logits = model(data)               # [4, 1, 208, 174]
+            mask_logits, iou_preds = model(data)               # [4, 1, 208, 174]
             assert mask_logits.dim() == 4
             gt = data["original_masks"].to(device)  # [1, 4, 208, 174]
             # calculate losses
             dice, bce, iou = calculate_segmentation_losses(gt, mask_logits.permute(1, 0, 2, 3))
-            loss.extend(bce)
+            loss.extend(bce.mean(axis=(-1, -2)).flatten().tolist())
             # print(f"Mask logits shape: {mask_logits.shape}, dtype: {mask_logits.dtype}")
             # Save mask logits & losses
-            mask_logits = mask_logits.squeeze(1).cpu().numpy()
+            mask_logits = mask_logits.squeeze(1).detach().cpu().numpy()
+            iou_preds = iou_preds.squeeze(1).detach().cpu().numpy()
             for j, mask_filename in enumerate(mask_filenames):
                 mem_file = io.BytesIO()
                 np.savez_compressed(mem_file,
                                     mask_logits=mask_logits[j].astype(np.float32),
+                                    iou_preds=iou_preds[j].astype(np.float32),
                                     dice_loss=np.array(dice[j], dtype=np.float32),
                                     bce_loss=np.array(bce[j], dtype=np.float32),
                                     iou_loss=np.array(iou[j], dtype=np.float32),
@@ -158,7 +160,9 @@ def process_single_mask_thread(models, bucket, method, mask_path_prefix, save_pa
     if method == "i":
         best_model, best_data = ImageLevelFusion(models, bucket, mask_path_prefix, mask_filename)
     elif method == "r":
-        best_model, best_data = RegionLevelFusionGCS(models, mask_path_prefix, mask_filename)
+        best_model, best_data = RegionLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename)
+    elif method == "u":
+        best_model, best_data = UnsupervisedFusionGCS(models, bucket, mask_path_prefix, mask_filename)
     else:
         raise NotImplementedError()
     assert isinstance(best_data["mask_logits"], np.ndarray), mask_filename
@@ -375,7 +379,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     print("Training complete!")
     return model
 
-def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, debug=False):
+def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
     dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "train")
     test_dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "test")
 
@@ -390,7 +394,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_wo
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), method=fusion, max_workers=num_workers)
     dataset.set_simple(False)
     # Continual training
-    model = continual_training(target, dataset, test_dataset, "fused", device=device, num_workers=num_workers, colab=True, debug=debug)
+    model = continual_training(target, dataset, test_dataset, "fused", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
     return
 
 
@@ -401,7 +405,8 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
     parser.add_argument("--fusion", default="i", help="Fusion method, choose from ['i', 'r', 'u'] (default: i)")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs (default: 10)")
     parser.add_argument("--debug", action="store_true", help="Debug mode (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, debug=args.debug)
+    main(args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, epochs=args.epochs, debug=args.debug)
