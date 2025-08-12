@@ -286,6 +286,8 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
 
         if organ_info:
             print("---Organ Scores---")
+            for org, scores in organ_dice.items():
+                print(f"{org}: {np.mean(scores)}")
             for org, scores in sorted(organ_dice.items(), key=lambda item: 1 - np.mean(item[1])):
                 print(f"{org}: {1 - np.mean(scores)}")
     return
