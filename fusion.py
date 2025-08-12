@@ -19,12 +19,41 @@ def ImageLevelFusion(models, mask_path, mask_filename):
     return data
 
 def RegionLevelFusion(models, mask_path, mask_filename):
-    # load gt mask
-    mask = cv2.imread(os.path.join(os.path.dirname(mask_path), mask_filename), cv2.IMREAD_UNCHANGED)
-    comp_mask = np.zeros_like(mask, np.float32)
+    """
+    Creates a composite mask logit by selecting the best logit for each pixel
+    from a set of models, based on the lowest pixel-wise BCE loss.
 
+    Args:
+        models (list): A list of model names.
+        mask_path (str): The base path where model data is stored.
+        mask_filename (str): The filename of the original mask.
 
-    return
+    Returns:
+        tuple: A tuple containing the composite mask logit (np.ndarray) and
+               the corresponding composite BCE scores (np.ndarray).
+    """
+    comp_mask, comp_bce = None, None
+    for model_name in models:
+        mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
+        cur = np.load(mask_path_full)
+        cur_mask = cur["mask_logits"]
+        cur_bce = cur["bce_loss"]
+        if comp_mask is None:
+            comp_mask = cur_mask
+            comp_bce = cur_bce
+        else:
+            # Find the pixels where the current model has a lower BCE loss
+            # This creates a boolean mask of True where the condition is met
+            is_better_pixel = cur_bce < comp_bce
+
+            # Use the boolean mask to update only those pixels in the composite arrays
+            # np.where is another option, but this is often more concise
+            comp_mask[is_better_pixel] = cur_mask[is_better_pixel]
+            comp_bce[is_better_pixel] = cur_bce[is_better_pixel]
+    
+    result = {}
+    result["mask_logits"] = comp_mask
+    return ("Composite", result)
 
 def UnsupervisedFusion(models, mask_path):
 
