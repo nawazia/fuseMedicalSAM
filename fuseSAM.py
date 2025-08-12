@@ -295,7 +295,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fanc
             test_dice_losses.append(dice_loss.item())
 
             if fancy:
-                info = os.path.basename(data["image_filename"]).split("--")
+                info = os.path.basename(data["image_filename"][0]).split("--")
                 modality = info[0]
                 mscores = modality_dice.get(modality, [])
                 mscores.append(dice_loss.item())
