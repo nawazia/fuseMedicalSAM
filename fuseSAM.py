@@ -258,12 +258,16 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False):
     print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
     if fancy:
         print("---Modality Scores---")
-        for mod, scores in modality_dice.items():
-            print(f"{mod}: {np.mean(scores)}")
+        for mod, scores in sorted(modality_dice.items(), key=lambda item: 1 - np.mean(item[1])):
+            # The item in the lambda function is a tuple (key, value),
+            # so we use item[1] to access the list of scores.
+            print(f"{mod}: {1 - np.mean(scores)}")
 
         print("---Dataset Scores---")
-        for dat, scores in dataset_dice.items():
-            print(f"{dat}: {np.mean(scores)}")
+        for dat, scores in sorted(dataset_dice.items(), key=lambda item: 1 - np.mean(item[1])):
+            # The item in the lambda function is a tuple (key, value),
+            # so we use item[1] to access the list of scores.
+            print(f"{dat}: {1 - np.mean(scores)}")
     return
 
 def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
