@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import cv2
 import torch
 import torch.nn as nn
 
@@ -11,13 +12,17 @@ def ImageLevelFusion(models, mask_path, mask_filename):
         cur = np.load(mask_path_full)
         dice = cur["dice_loss"]
         bce = cur["bce_loss"]
-        loss = bce + dice
+        loss = bce.mean() + dice
         if loss < min_loss:
             data = (model_name, cur)
 
     return data
 
-def RegionLevelFusion(models, mask_path):
+def RegionLevelFusion(models, mask_path, mask_filename):
+    # load gt mask
+    mask = cv2.imread(os.path.join(os.path.dirname(mask_path), mask_filename), cv2.IMREAD_UNCHANGED)
+    comp_mask = np.zeros_like(mask, np.float32)
+
 
     return
 

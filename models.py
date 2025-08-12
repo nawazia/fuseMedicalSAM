@@ -287,13 +287,14 @@ def calculate_segmentation_losses(gt_masks, mask_logits):
     # The output shape will be [B, C, H, W]
     bce_loss_fn = nn.BCEWithLogitsLoss(reduction='none')
     bce_pixel_losses = bce_loss_fn(mask_logits, gt_masks)
+    bce_pixel_losses_numpy = bce_pixel_losses.squeeze().cpu().numpy()
 
-    # To get a single BCE loss value per mask (channel), average over H and W
-    # The result will be shape [B, C]
-    bce_losses_per_mask_tensor = bce_pixel_losses.mean(dim=(-1, -2)) # Average over H and W
+    # # To get a single BCE loss value per mask (channel), average over H and W
+    # # The result will be shape [B, C]
+    # bce_losses_per_mask_tensor = bce_pixel_losses.mean(dim=(-1, -2)) # Average over H and W
 
-    # Convert to a list of individual loss values (flattened Bx_C_ list)
-    bce_losses_list = bce_losses_per_mask_tensor.flatten().tolist()
+    # # Convert to a list of individual loss values (flattened Bx_C_ list)
+    # bce_losses_list = bce_losses_per_mask_tensor.flatten().tolist()
 
 
     # --- 2. Calculate Dice & IoU Loss ---
@@ -344,4 +345,4 @@ def calculate_segmentation_losses(gt_masks, mask_logits):
             iou_losses_list.append(iou_loss_val.item())
 
     # Return lists of individual scalar losses
-    return dice_losses_list, bce_losses_list, iou_losses_list
+    return dice_losses_list, bce_pixel_losses_numpy, iou_losses_list
