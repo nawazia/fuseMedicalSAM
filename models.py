@@ -83,8 +83,8 @@ class SAM4Med(nn.Module):
         ), "input image should be resized to 1024*1024"
         assert input_image.shape[-2:] == (1024, 1024)
         # pre-compute the image embedding
-        with torch.no_grad():
-            embedding = self.sam_model.image_encoder(input_image)
+        # with torch.no_grad():
+        embedding = self.sam_model.image_encoder(input_image)
         
         self.sam4med.original_size = tuple(original_size)  # Set original size for the predictor
         self.sam4med.input_size = prepad_size  # Set input size for the prepad
