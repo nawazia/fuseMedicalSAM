@@ -61,6 +61,7 @@ def UnsupervisedFusion(models, mask_path, mask_filename):
         mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
         cur = np.load(mask_path_full)
         iou_preds = cur["iou_preds"]
+        print(iou_preds)
         if iou_preds > max_iou:
             data = (model_name, cur)
 
