@@ -292,7 +292,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
             data["boxes"] = data['boxes'].to(device)
 
             # Generate mask logits
-            mask_logits = model(data)                   # [4, 1, 208, 174]
+            mask_logits, iou_preds = model(data)                   # [4, 1, 208, 174]
             assert mask_logits.dim() == 4
             gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
             teacher_logits = data["teacher_logits"].to(device)
