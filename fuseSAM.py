@@ -87,7 +87,7 @@ def knowledge_externalization(models : list,
 
             # Generate mask logits
             # cv2.imwrite(f"img.tif", (data['image'].float().squeeze()[0].cpu().numpy()).astype(np.float32))
-            mask_logits = model(data)               # [4, 1, 208, 174]
+            mask_logits, iou_preds = model(data)               # [4, 1, 208, 174]
             assert mask_logits.dim() == 4
             gt = data["original_masks"].to(device)  # [1, 4, 208, 174]
             # calculate losses
@@ -95,12 +95,14 @@ def knowledge_externalization(models : list,
             loss.extend(bce.mean(axis=(-1, -2)).flatten().tolist())
             # print(f"Mask logits shape: {mask_logits.shape}, dtype: {mask_logits.dtype}")
             # Save mask logits & losses
-            mask_logits = mask_logits.squeeze(1).cpu().detach().numpy()
+            mask_logits = mask_logits.squeeze(1).detach().cpu().numpy()
+            iou_preds = iou_preds.squeeze(1).detach().cpu().numpy()
             for j, mask_filename in enumerate(mask_filenames):
                 mask_save_path = os.path.join(save_path, model_name, f"{mask_filename[:-4]}_mask_logits")
                 print(f"Saving mask logits to: {mask_save_path}")
                 np.savez_compressed(mask_save_path + ".npz",
                                     mask_logits=mask_logits[j].astype(np.float32),
+                                    iou_preds=iou_preds[j].astype(np.float32),
                                     dice_loss=np.array(dice[j], dtype=np.float32),
                                     bce_loss=np.array(bce[j], dtype=np.float32),
                                     iou_loss=np.array(iou[j], dtype=np.float32),
@@ -126,6 +128,8 @@ def process_single_mask_thread(models, method, mask_path, save_path, mask_filena
         best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
     elif method == "r":
         best_model, best_data = RegionLevelFusion(models, mask_path, mask_filename)
+    elif method == "u":
+        best_model, best_data = UnsupervisedFusion(models, mask_path, mask_filename)
     else:
         raise NotImplementedError()
     assert isinstance(best_data["mask_logits"], np.ndarray), mask_filename
