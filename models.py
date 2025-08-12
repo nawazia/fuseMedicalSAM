@@ -43,7 +43,7 @@ class MedSAM(nn.Module):
         self.inference = medsam_inference
         self.image_size = image_size
         self.medsam = sam_model_registry_medsam[model_type](checkpoint=sam_checkpoint)
-        self.medsam.eval()
+        # self.medsam.eval()
 
     def forward(self, data):
         img = data["image"]
@@ -67,7 +67,7 @@ class SAM4Med(nn.Module):
         super().__init__()
         self.sam4med = predictor
         self.sam_model = sam_model_registry_sam4med[model_type](checkpoint=checkpoint, device="cpu").to(predictor.device)
-        self.sam_model.eval()
+        # self.sam_model.eval()
 
     def forward(self, data):
         original_size = data["original_size"]
