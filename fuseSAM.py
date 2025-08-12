@@ -266,11 +266,14 @@ def fuse_multithread(models: list,
     print(counts)
     return save_path
 
-def eval_post_epoch(model, test_dataloader, criterion, device, debug=False):
+def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fancy=False):
     model.eval()
     test_losses = []
     test_bce_losses = []
     test_dice_losses = []
+    if fancy:
+        modality_dice = {}
+        dataset_dice = {}
 
     pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
     with torch.no_grad():
@@ -290,6 +293,18 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False):
             test_losses.append(combined_loss.item())
             test_bce_losses.append(bce_loss.item())
             test_dice_losses.append(dice_loss.item())
+
+            if fancy:
+                info = os.path.basename(data["image_filename"]).split("--")
+                modality = info[0]
+                mscores = modality_dice.get(modality, [])
+                mscores.append(dice_loss.item())
+                modality_dice[modality] = mscores
+
+                dataset = info[1]
+                dscores = dataset_dice.get(dataset, [])
+                dscores.append(dice_loss.item())
+                dataset_dice[dataset] = dscores
             
             pbar_test.set_postfix({
                 'test_loss': f'{combined_loss.item():.4f}',
@@ -301,6 +316,14 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False):
     avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
     
     print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
+    if fancy:
+        print("---Modality Scores---")
+        for mod, scores in modality_dice.items():
+            print(f"{mod}: {np.mean(scores)}")
+
+        print("---Dataset Scores---")
+        for dat, scores in dataset_dice.items():
+            print(f"{dat}: {np.mean(scores)}")
     return
 
 def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
@@ -342,7 +365,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    eval_post_epoch(model, test_dataloader, criterion, device, debug)
+    eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
 
@@ -377,6 +400,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
         eval_post_epoch(model, test_dataloader, criterion, device)
     
     print("Training complete!")
+    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
     return model
 
 def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
