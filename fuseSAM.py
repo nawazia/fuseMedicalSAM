@@ -249,7 +249,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
                     organ = mapping[dataset][mask_info[4].split('_')[0]]
                     oscores = organ_dice.get(organ, [])
                     oscores.append(batch_dice)
-                    organ_dice[dataset] = oscores
+                    organ_dice[organ] = oscores
             combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
 
             test_losses.append(combined_loss.item())
