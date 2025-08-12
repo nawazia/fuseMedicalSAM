@@ -419,6 +419,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_wo
     dataset.set_simple(False)
     # Continual training
     model = continual_training(target, dataset, test_dataset, "fused", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
+    torch.save(model.state_dict(), f"fused_{target}.pth")
     return
 
 
