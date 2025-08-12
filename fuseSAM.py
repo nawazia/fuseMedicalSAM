@@ -243,6 +243,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
                 dataset = image_info[1]
             if organ_info:
                 batch_dice = criterion2(mask_logits, gt)
+                batch_dice = batch_dice.flatten().tolist()
                 print(batch_dice)
                 for mask_filename in data["mask_filenames"]:
                     mask_info = os.path.basename(mask_filename[0])[:-4].split("--")
