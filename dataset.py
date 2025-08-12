@@ -590,11 +590,7 @@ class MiniMSAMDatasetGCS(Dataset):
                     mask_logits = npz_data['mask_logits']
                     all_mask_logits.append(mask_logits)
             # The final shape will be (num_masks, H, W)
-            try:
-                stacked_logits = torch.from_numpy(np.stack(all_mask_logits, axis=0)).float()
-            except:
-                print(image_filename)
-                stacked_logits = None
+            stacked_logits = torch.from_numpy(np.stack(all_mask_logits, axis=0)).float()
             sample['teacher_logits'] = stacked_logits
         return sample
 
