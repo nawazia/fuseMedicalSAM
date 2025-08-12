@@ -304,7 +304,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    eval_post_epoch(model, test_dataloader, criterion, device)
+    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
 
@@ -337,6 +337,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
         eval_post_epoch(model, test_dataloader, criterion, device)
     
     print("Training complete!")
+    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
     return model
 
 def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, colab=False):
