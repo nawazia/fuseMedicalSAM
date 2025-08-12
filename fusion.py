@@ -67,8 +67,9 @@ def UnsupervisedFusion(models, mask_path, mask_filename):
     return data
 
 class DiceLoss(nn.Module):
-    def __init__(self, smooth=1.0):
+    def __init__(self, reduction="mean", smooth=1.0):
         super(DiceLoss, self).__init__()
+        self.reduction = reduction
         self.smooth = smooth
 
     def forward(self, pred, mask):
@@ -104,7 +105,10 @@ class DiceLoss(nn.Module):
         
         # Finally, average the loss across the entire batch (B) AND channels (C)
         # to get a single scalar for backpropagation.
-        return torch.mean(dice_loss)
+        if self.reduction == "mean":
+            return torch.mean(dice_loss)
+        else:
+            return dice_loss
 
 class SegmentationLoss(nn.Module):
     def __init__(self, dice_weight=1.0, bce_weight=1.0):

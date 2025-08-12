@@ -1,5 +1,6 @@
 import argparse
 import os
+import json
 import glob
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import MiniMSAMDataset
 from models import load_model, calculate_segmentation_losses
 from fusion import ImageLevelFusion, RegionLevelFusion, UnsupervisedFusion
-from fusion import CombinedLoss
+from fusion import CombinedLoss, DiceLoss
 
 
 def knowledge_externalization(models : list,
@@ -207,7 +208,7 @@ def fuse_multithread(models: list,
     print(counts)
     return save_path
 
-def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False):
+def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, organ_info=None):
     model.eval()
     test_losses = []
     test_bce_losses = []
@@ -216,6 +217,14 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False):
     if fancy:
         modality_dice = {}
         dataset_dice = {}
+        if organ_info:
+            organ_dice = {}
+            criterion2 = DiceLoss(reduction="none")
+            with open(organ_info, 'r') as file:
+                mapping = json.load(file)
+            
+            for key in mapping:
+                mapping[key] = {v: k for k, v in mapping[key].items()}
 
     pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
     with torch.no_grad():
@@ -228,6 +237,20 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False):
 
             gt = gt.float()
             mask_logits = mask_logits.float()
+            if fancy:
+                image_info = os.path.basename(data["image_filename"][0]).split("--")
+                modality = image_info[0]
+                dataset = image_info[1]
+            if organ_info:
+                batch_dice = criterion2(mask_logits, gt)
+                print(batch_dice)
+                for mask_filename in data["mask_filename"]:
+                    mask_info = os.path.basename(mask_filename)[:-4].split("--")
+                    organ = mask_info[4]
+                    mapping[dataset][mask_info[4].split('_')[0]]
+                    oscores = organ_dice.get(organ, [])
+                    oscores.append(batch_dice)
+                    organ_dice[dataset] = oscores
             combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
 
             test_losses.append(combined_loss.item())
@@ -235,13 +258,10 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False):
             test_dice_losses.append(dice_loss.item())
 
             if fancy:
-                info = os.path.basename(data["image_filename"][0]).split("--")
-                modality = info[0]
                 mscores = modality_dice.get(modality, [])
                 mscores.append(dice_loss.item())
                 modality_dice[modality] = mscores
 
-                dataset = info[1]
                 dscores = dataset_dice.get(dataset, [])
                 dscores.append(dice_loss.item())
                 dataset_dice[dataset] = dscores
@@ -259,15 +279,16 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False):
     if fancy:
         print("---Modality Scores---")
         for mod, scores in sorted(modality_dice.items(), key=lambda item: 1 - np.mean(item[1])):
-            # The item in the lambda function is a tuple (key, value),
-            # so we use item[1] to access the list of scores.
             print(f"{mod}: {1 - np.mean(scores)}")
 
         print("---Dataset Scores---")
         for dat, scores in sorted(dataset_dice.items(), key=lambda item: 1 - np.mean(item[1])):
-            # The item in the lambda function is a tuple (key, value),
-            # so we use item[1] to access the list of scores.
             print(f"{dat}: {1 - np.mean(scores)}")
+
+        if organ_info:
+            print("---Organ Scores---")
+            for org, scores in sorted(organ_dice.items(), key=lambda item: 1 - np.mean(item[1])):
+                print(f"{org}: {1 - np.mean(scores)}")
     return
 
 def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
@@ -308,7 +329,11 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
+    if os.path.basename(os.path.dirname(dataset.data_path)) == "1.7K":
+        organ_info = os.path.join(os.path.dirname(dataset.json_path), "SAMed2D_v1_class_mapping_id.json")
+    else:
+        organ_info = None
+    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True, organ_info=organ_info)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
 
@@ -341,7 +366,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
         eval_post_epoch(model, test_dataloader, criterion, device)
     
     print("Training complete!")
-    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
+    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True, organ_info=organ_info)
     return model
 
 def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, colab=False):
