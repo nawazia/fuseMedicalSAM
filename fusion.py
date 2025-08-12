@@ -29,8 +29,7 @@ def RegionLevelFusion(models, mask_path, mask_filename):
         mask_filename (str): The filename of the original mask.
 
     Returns:
-        tuple: A tuple containing the composite mask logit (np.ndarray) and
-               the corresponding composite BCE scores (np.ndarray).
+        tuple: A tuple containing the "composite" (str) and composite mask logit (np.ndarray).
     """
     comp_mask, comp_bce = None, None
     for model_name in models:

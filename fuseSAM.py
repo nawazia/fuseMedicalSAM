@@ -112,7 +112,7 @@ def knowledge_externalization(models : list,
         print(f"Finished processing {model_name} in {time.time() - t:.2f} seconds")
     return save_path
 
-def process_single_mask_thread(models, mask_path, save_path, mask_filename, counts):
+def process_single_mask_thread(models, method, mask_path, save_path, mask_filename, counts):
     """
     Function to process a single mask filename.
     Designed to be run by a threading worker.
@@ -122,8 +122,12 @@ def process_single_mask_thread(models, mask_path, save_path, mask_filename, coun
     if os.path.exists(mask_save_path + ".npz"):
         print(f"{mask_save_path}.npz already exists, skipping...")
         return None # Indicate skipping
-
-    best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
+    if method == "i":
+        best_model, best_data = ImageLevelFusion(models, mask_path, mask_filename)
+    elif method == "r":
+        best_model, best_data = RegionLevelFusion(models, mask_path, mask_filename)
+    else:
+        raise NotImplementedError()
     assert isinstance(best_data["mask_logits"], np.ndarray), mask_filename
     print(f"Saving mask logits to: {mask_save_path}.npz")
     np.savez_compressed(mask_save_path + ".npz", **best_data)
@@ -140,6 +144,7 @@ def fuse_multithread(models: list,
                      dataset: MiniMSAMDataset,
                      mask_path: str = "mask_logits",
                      save_path: str = "fused",
+                     method: str = "i",
                      max_workers: int = None): # New parameter for number of threads
     '''
     For each mask:
@@ -167,6 +172,7 @@ def fuse_multithread(models: list,
     save_path : str
         Path where the fused mask_logits are saved. Defaults to "fused".
     '''
+    save_path = f"{save_path}_{method}"
     os.makedirs(save_path, exist_ok=True)
     dataset.set_simple(True)
 
@@ -186,7 +192,7 @@ def fuse_multithread(models: list,
         for i, data in enumerate(dataset):
             mask_filenames = data["mask_filenames"]
             for mask_filename in mask_filenames:
-                future = executor.submit(process_single_mask_thread, models, mask_path, save_path, mask_filename, counts)
+                future = executor.submit(process_single_mask_thread, models, method, mask_path, save_path, mask_filename, counts)
                 futures.append(future)
 
         # Use tqdm to show progress as futures complete
@@ -305,7 +311,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     print("Training complete!")
     return model
 
-def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, colab=False):
+def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
     target = "SAM-Med2D"
@@ -314,7 +320,7 @@ def main(data_path: str, json_path: str, device: str = "cpu", num_workers=0, col
     # KE
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
     # Fusion
-    fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), max_workers=num_workers)
+    fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), method=fusion, max_workers=num_workers)
     dataset.set_simple(False)
     # Continual training
     test_dataset = MiniMSAMDataset(data_path, json_path, "test")
@@ -327,8 +333,9 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", required=True, help="Path to dir containing images and masks (and created mask_logits) folders")
     parser.add_argument("--json_path", required=True, help="Path to JSON files containing image-mask pairs.")
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
+    parser.add_argument("--fusion", default="i", help="Fusion method, choose from ['i', 'r', 'u'] (default: i)")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
     parser.add_argument("--colab", action="store_true", help="Run on Colab (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, num_workers=args.num_workers, colab=args.colab)
+    main(args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, colab=args.colab)
