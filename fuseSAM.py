@@ -283,7 +283,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fanc
             data['image'] = data['image'].to(device).float()
             data["boxes"] = data['boxes'].to(device)
             gt = data["original_masks"].to(device)
-            mask_logits = model(data)
+            mask_logits, iou_preds = model(data)
             mask_logits = mask_logits.permute(1, 0, 2, 3) 
 
             gt = gt.float()
@@ -379,7 +379,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
             data["boxes"] = data['boxes'].to(device)
 
             # Generate mask logits
-            mask_logits = model(data)                   # [4, 1, 208, 174]
+            mask_logits, iou_preds = model(data)                   # [4, 1, 208, 174]
             assert mask_logits.dim() == 4
             gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
             teacher_logits = data["teacher_logits"].to(device)
