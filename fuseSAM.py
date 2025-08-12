@@ -247,8 +247,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
                 print(batch_dice)
                 for mask_filename in data["mask_filenames"]:
                     mask_info = os.path.basename(mask_filename[0])[:-4].split("--")
-                    organ = mask_info[4]
-                    mapping[dataset][mask_info[4].split('_')[0]]
+                    organ = mapping[dataset][mask_info[4].split('_')[0]]
                     oscores = organ_dice.get(organ, [])
                     oscores.append(batch_dice)
                     organ_dice[dataset] = oscores
