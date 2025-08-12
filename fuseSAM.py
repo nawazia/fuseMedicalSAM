@@ -318,12 +318,12 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fanc
     print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
     if fancy:
         print("---Modality Scores---")
-        for mod, scores in modality_dice.items():
-            print(f"{mod}: {np.mean(scores)}")
+        for mod, scores in sorted(modality_dice.items(), key=lambda item: 1 - np.mean(item[1])):
+            print(f"{mod}: {1 - np.mean(scores)}")
 
         print("---Dataset Scores---")
-        for dat, scores in dataset_dice.items():
-            print(f"{dat}: {np.mean(scores)}")
+        for dat, scores in sorted(dataset_dice.items(), key=lambda item: 1 - np.mean(item[1])):
+            print(f"{dat}: {1 - np.mean(scores)}")
     return
 
 def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
@@ -403,6 +403,76 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
     return model
 
+def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
+    # first eval on kits
+    kits_path = os.path.join("gs://sam-med2d-17k", data_path, "kits23")
+    kits_ds = MiniMSAMDataset("sam-med2d-17k", kits_path, os.path.join(kits_path, "KiTS23.json"), "test")
+    kits_dl = DataLoader(kits_ds, batch_size=1, shuffle=False, num_workers=num_workers)
+    model.eval()
+    test_bce_losses = []
+    test_dice_losses = []
+
+    pbar_test = tqdm.tqdm(kits_dl, desc="Testing")
+    with torch.no_grad():
+        for data in pbar_test:
+            data['image'] = data['image'].to(device).float()
+            data["boxes"] = data['boxes'].to(device)
+            gt = data["original_masks"].to(device)
+            mask_logits, iou_preds = model(data)
+            mask_logits = mask_logits.permute(1, 0, 2, 3)
+
+            gt = gt.float()
+            mask_logits = mask_logits.float()
+            combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
+
+            test_bce_losses.append(bce_loss.item())
+            test_dice_losses.append(dice_loss.item())
+            
+            pbar_test.set_postfix({
+                'test_loss': f'{combined_loss.item():.4f}',
+            })
+
+    pbar_test.close()
+    avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
+    avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
+    
+    print(f"Avg KiTS23 BCE: {avg_val_bce:.4f} | Avg KiTS23 Dice: {avg_val_dice:.4f}")
+    
+    # first eval on kits
+    segrap_path = os.path.join("gs://sam-med2d-17k", data_path, "segrap23")
+    segrap_ds = MiniMSAMDataset("sam-med2d-17k", segrap_path, os.path.join(segrap_path, "segrap23.json"), "test")
+    segrap_dl = DataLoader(segrap_ds, batch_size=1, shuffle=False, num_workers=num_workers)
+    model.eval()
+    test_bce_losses = []
+    test_dice_losses = []
+
+    pbar_test = tqdm.tqdm(segrap_dl, desc="Testing")
+    with torch.no_grad():
+        for data in pbar_test:
+            data['image'] = data['image'].to(device).float()
+            data["boxes"] = data['boxes'].to(device)
+            gt = data["original_masks"].to(device)
+            mask_logits, iou_preds = model(data)
+            mask_logits = mask_logits.permute(1, 0, 2, 3)
+
+            gt = gt.float()
+            mask_logits = mask_logits.float()
+            combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
+
+            test_bce_losses.append(bce_loss.item())
+            test_dice_losses.append(dice_loss.item())
+            
+            pbar_test.set_postfix({
+                'test_loss': f'{combined_loss.item():.4f}',
+            })
+
+    pbar_test.close()
+    avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
+    avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
+    
+    print(f"Avg SegRap2023 BCE: {avg_val_bce:.4f} | Avg SegRap2023 Dice: {avg_val_dice:.4f}")
+    return 0
+
 def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
     dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "train")
     test_dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "test")
@@ -418,8 +488,9 @@ def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_wo
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), method=fusion, max_workers=num_workers)
     dataset.set_simple(False)
     # Continual training
-    model = continual_training(target, dataset, test_dataset, "fused", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
+    model = continual_training(target, dataset, test_dataset, f"fused_{fusion}", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
     torch.save(model.state_dict(), f"/content/drive/My Drive/fused_{target}_{fusion}.pth")
+    external_eval(model, data_path, CombinedLoss(), num_workers=num_workers, device=device)
     return
 
 
