@@ -4,21 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-def ImageLevelFusion(models, mask_path, mask_filename):
-    min_loss = np.inf
-    data = (None, None)
-    for model_name in models:
-        mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
-        cur = np.load(mask_path_full)
-        dice = cur["dice_loss"]
-        bce = cur["bce_loss"]
-        loss = bce + dice
-        if loss < min_loss:
-            data = (model_name, cur)
-
-    return data
-
-def ImageLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename):
+def ImageLevelFusion(models, bucket, mask_path_prefix, mask_filename):
     """
     Finds the best model for a given mask by loading logits from a GCS bucket.
 
@@ -69,9 +55,99 @@ def ImageLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename):
 
     return data
 
-def RegionLevelFusion(models, mask_path):
+def RegionLevelFusion(models, mask_path, mask_filename):
+    """
+    Creates a composite mask logit by selecting the best logit for each pixel
+    from a set of models, based on the lowest pixel-wise BCE loss.
 
-    return
+    Args:
+        models (list): A list of model names.
+        mask_path (str): The base path where model data is stored.
+        mask_filename (str): The filename of the original mask.
+
+    Returns:
+        tuple: A tuple containing the "composite" (str) and composite mask logit (np.ndarray).
+    """
+    comp_mask, comp_bce = None, None
+    for model_name in models:
+        mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
+        cur = np.load(mask_path_full)
+        cur_mask = cur["mask_logits"]
+        cur_bce = cur["bce_loss"]
+        if comp_mask is None:
+            comp_mask = cur_mask
+            comp_bce = cur_bce
+        else:
+            # Find the pixels where the current model has a lower BCE loss
+            # This creates a boolean mask of True where the condition is met
+            is_better_pixel = cur_bce < comp_bce
+
+            # Use the boolean mask to update only those pixels in the composite arrays
+            # np.where is another option, but this is often more concise
+            comp_mask[is_better_pixel] = cur_mask[is_better_pixel]
+            comp_bce[is_better_pixel] = cur_bce[is_better_pixel]
+    
+    result = {}
+    result["mask_logits"] = comp_mask
+    return ("Composite", result)
+
+def RegionLevelFusionGCS(models, bucket, mask_path_prefix, mask_filename):
+    """
+    Finds the best model for a given mask by loading logits from a GCS bucket.
+
+    Parameters
+    ----------
+    models : list
+        List of SAM models to be used for fusion.
+    bucket : google.cloud.storage.bucket.Bucket
+        The GCS bucket object.
+    mask_path_prefix : str
+        The GCS path prefix to the model logits folder.
+    mask_filename : str
+        The base filename of the mask to load.
+
+    Returns
+    -------
+    data : tuple
+        A tuple containing the best model name and the loaded data.
+    """
+    comp_mask, comp_bce = None, None
+    
+    for model_name in models:
+        # Construct the GCS blob name
+        npz_blob_name = f"{mask_path_prefix}/{model_name}/{os.path.basename(mask_filename)[:-4]}_mask_logits.npz"
+        
+        try:
+            # Get the blob and download its content into a BytesIO buffer
+            blob = bucket.blob(npz_blob_name)
+            npz_data_bytes = blob.download_as_bytes()
+            mem_file = io.BytesIO(npz_data_bytes)
+            
+            # Load the data from the in-memory buffer
+            cur = np.load(mem_file)
+            cur_mask = cur["mask_logits"]
+            cur_bce = cur["bce_loss"]
+            if comp_mask is None:
+                comp_mask = cur_mask
+                comp_bce = cur_bce
+            else:
+                # Find the pixels where the current model has a lower BCE loss
+                # This creates a boolean mask of True where the condition is met
+                is_better_pixel = cur_bce < comp_bce
+
+                # Use the boolean mask to update only those pixels in the composite arrays
+                # np.where is another option, but this is often more concise
+                comp_mask[is_better_pixel] = cur_mask[is_better_pixel]
+                comp_bce[is_better_pixel] = cur_bce[is_better_pixel]
+
+        except Exception as e:
+            # Handle cases where the file might not exist for a given model
+            print(f"Error loading {npz_blob_name}: {e}")
+            continue
+
+    result = {}
+    result["mask_logits"] = comp_mask
+    return ("Composite", result)
 
 def UnsupervisedFusion(models, mask_path):
 
