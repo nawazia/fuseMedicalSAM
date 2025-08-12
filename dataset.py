@@ -408,9 +408,12 @@ class MiniMSAMDataset(Dataset):
             fused_paths_full = [os.path.join(self.fused_path, os.path.basename(mask_filename)[:-4]+"_mask_logits.npz") for mask_filename in mask_filenames]
             all_mask_logits = []
             for npz_path in fused_paths_full:
-                with np.load(npz_path) as data:
-                    mask_logits = data['mask_logits']
-                    all_mask_logits.append(mask_logits)
+                try:
+                    with np.load(npz_path) as data:
+                        mask_logits = data['mask_logits']
+                        all_mask_logits.append(mask_logits)
+                except:
+                    print(npz_path)
             # The final shape will be (num_masks, H, W)
             stacked_logits = torch.from_numpy(np.stack(all_mask_logits, axis=0)).float()
             sample['teacher_logits'] = stacked_logits
