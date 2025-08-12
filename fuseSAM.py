@@ -219,7 +219,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device):
             data['image'] = data['image'].to(device).float()
             data["boxes"] = data['boxes'].to(device)
             gt = data["original_masks"].to(device)
-            mask_logits = model(data)
+            mask_logits, iou_preds = model(data)
             mask_logits = mask_logits.permute(1, 0, 2, 3) 
 
             gt = gt.float()
