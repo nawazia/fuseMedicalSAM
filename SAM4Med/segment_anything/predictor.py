@@ -171,7 +171,7 @@ class SamPredictor:
         low_res_masks = low_res_masks[0].detach().cpu().numpy()
         return masks, iou_predictions, low_res_masks
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def predict_torch(
         self,
         point_coords: Optional[torch.Tensor],
