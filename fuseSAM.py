@@ -329,39 +329,39 @@ def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=Fa
 
 def external_eval(model, target, criterion, num_workers=0, device="cuda"):
     # first eval on kits
-    # kits_path = os.path.join("data", "kits23")
-    # kits_ds = MiniMSAMDataset("sam-med2d-17k", kits_path, os.path.join(kits_path, "KiTS23.json"), "test")
-    # kits_ds.set_transforms(target)
-    # kits_dl = DataLoader(kits_ds, batch_size=1, shuffle=False, num_workers=num_workers)
-    # model.eval()
-    # test_bce_losses = []
-    # test_dice_losses = []
+    kits_path = os.path.join("data", "kits23")
+    kits_ds = MiniMSAMDataset("sam-med2d-17k", kits_path, os.path.join(kits_path, "KiTS23.json"), "test")
+    kits_ds.set_transforms(target)
+    kits_dl = DataLoader(kits_ds, batch_size=1, shuffle=False, num_workers=num_workers)
+    model.eval()
+    test_bce_losses = []
+    test_dice_losses = []
 
-    # pbar_test = tqdm.tqdm(kits_dl, desc="Testing")
-    # with torch.no_grad():
-    #     for data in pbar_test:
-    #         data['image'] = data['image'].to(device).float()
-    #         data["boxes"] = data['boxes'].to(device)
-    #         gt = data["original_masks"].to(device)
-    #         mask_logits, iou_preds = model(data)
-    #         mask_logits = mask_logits.permute(1, 0, 2, 3)
+    pbar_test = tqdm.tqdm(kits_dl, desc="Testing")
+    with torch.no_grad():
+        for data in pbar_test:
+            data['image'] = data['image'].to(device).float()
+            data["boxes"] = data['boxes'].to(device)
+            gt = data["original_masks"].to(device)
+            mask_logits, iou_preds = model(data)
+            mask_logits = mask_logits.permute(1, 0, 2, 3)
 
-    #         gt = gt.float()
-    #         mask_logits = mask_logits.float()
-    #         combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
+            gt = gt.float()
+            mask_logits = mask_logits.float()
+            combined_loss, bce_loss, dice_loss, _ = criterion(mask_logits, gt)
 
-    #         test_bce_losses.append(bce_loss.item())
-    #         test_dice_losses.append(dice_loss.item())
+            test_bce_losses.append(bce_loss.item())
+            test_dice_losses.append(dice_loss.item())
             
-    #         pbar_test.set_postfix({
-    #             'test_loss': f'{combined_loss.item():.4f}',
-    #         })
+            pbar_test.set_postfix({
+                'test_loss': f'{combined_loss.item():.4f}',
+            })
 
-    # pbar_test.close()
-    # avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
-    # avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
+    pbar_test.close()
+    avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
+    avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
     
-    # print(f"Avg KiTS23 BCE: {avg_val_bce:.4f} | Avg KiTS23 Dice: {avg_val_dice:.4f}")
+    print(f"Avg KiTS23 BCE: {avg_val_bce:.4f} | Avg KiTS23 Dice: {avg_val_dice:.4f}")
     
     # second eval on segrap
     segrap_path = os.path.join("data", "segrap2023")
@@ -441,7 +441,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    external_eval(model, target, criterion, num_workers, device)
+    # external_eval(model, target, criterion, num_workers, device)
     eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
