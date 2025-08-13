@@ -369,11 +369,11 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     eval_post_epoch(model, test_dataloader, criterion, device, fancy=True, organ_info=organ_info)
     return model
 
-def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, colab=False):
+def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
-    target = "MedSAM"
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
+    assert target in models
     print(f"Models to be used: {models}")
     # KE
     mask_path = knowledge_externalization(models, dataset, save_path=os.path.join(data_path, "mask_logits"), device=device, num_workers=num_workers, colab=colab)
@@ -392,9 +392,10 @@ if __name__ == "__main__":
     parser.add_argument("--json_path", required=True, help="Path to JSON files containing image-mask pairs.")
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
     parser.add_argument("--fusion", default="i", help="Fusion method, choose from ['i', 'r', 'u'] (default: i)")
+    parser.add_argument("--target", default="SAM-Med2D", help="Target model, choose from ['SAM-Med2D', 'SAM4Med', 'MedSAM'] (default: SAM-Med2D)")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs (default: 10)")
     parser.add_argument("--colab", action="store_true", help="Run on Colab (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, epochs=args.epochs, colab=args.colab)
+    main(args.target, args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, epochs=args.epochs, colab=args.colab)
