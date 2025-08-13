@@ -43,7 +43,7 @@ class MedSAM(nn.Module):
         self.inference = medsam_inference
         self.image_size = image_size
         self.medsam = sam_model_registry_medsam[model_type](checkpoint=sam_checkpoint)
-        self.medsam.eval()
+        # self.medsam.eval()
 
     def forward(self, data):
         img = data["image"]
@@ -52,8 +52,8 @@ class MedSAM(nn.Module):
         # newh, neww = data["prepad_size"]
         # segs = np.zeros((len(boxes), H, W), dtype=np.float32)
 
-        with torch.no_grad():
-            image_embedding = self.medsam.image_encoder(img.float())
+        # with torch.no_grad():
+        image_embedding = self.medsam.image_encoder(img.float())
 
         if len(boxes.shape) == 2:
             boxes = boxes[:, None, :]  # (B, 1, 4)
