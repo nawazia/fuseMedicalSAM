@@ -473,12 +473,12 @@ def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
     print(f"Avg SegRap2023 BCE: {avg_val_bce:.4f} | Avg SegRap2023 Dice: {avg_val_dice:.4f}")
     return 0
 
-def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
+def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
     dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "train")
     test_dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "test")
 
-    target = "SAM-Med2D"
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
+    assert target in models
     print(f"Models to be used: {models}")
     # KE
     save_path = os.path.join("gs://sam-med2d-17k", data_path, "mask_logits")
@@ -500,9 +500,10 @@ if __name__ == "__main__":
     parser.add_argument("--json_path", required=True, help="Path to JSON files containing image-mask pairs.")
     parser.add_argument("--device", default="cpu", help="Device to run the model on (default: cpu)")
     parser.add_argument("--fusion", default="i", help="Fusion method, choose from ['i', 'r', 'u'] (default: i)")
+    parser.add_argument("--target", default="SAM-Med2D", help="Target mode, choose from ['SAM-Med2D', 'SAM4Med', 'MedSAM'] (default: SAM-Med2D)")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of workers (default: 0)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs (default: 10)")
     parser.add_argument("--debug", action="store_true", help="Debug mode (default: False)")
     args = parser.parse_args()
 
-    main(args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, epochs=args.epochs, debug=args.debug)
+    main(args.target, args.data_path, args.json_path, device=args.device, fusion=args.fusion, num_workers=args.num_workers, epochs=args.epochs, debug=args.debug)
