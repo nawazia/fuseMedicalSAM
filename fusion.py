@@ -36,7 +36,6 @@ def RegionLevelFusion(models, mask_path, mask_filename):
         mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
         cur = np.load(mask_path_full)
         cur_mask = cur["mask_logits"]
-        print(mask_path_full, cur_mask.shape)
         cur_bce = cur["bce_loss"]
         if comp_mask is None:
             comp_mask = cur_mask
@@ -48,8 +47,13 @@ def RegionLevelFusion(models, mask_path, mask_filename):
 
             # Use the boolean mask to update only those pixels in the composite arrays
             # np.where is another option, but this is often more concise
-            comp_mask[is_better_pixel] = cur_mask[is_better_pixel]
-            comp_bce[is_better_pixel] = cur_bce[is_better_pixel]
+            try:
+                comp_mask[is_better_pixel] = cur_mask[is_better_pixel]
+                comp_bce[is_better_pixel] = cur_bce[is_better_pixel]
+            except:
+                print(mask_path_full)
+                print(comp_mask.shape, is_better_pixel.shape)
+                raise IndexError
     
     result = {}
     result["mask_logits"] = comp_mask
