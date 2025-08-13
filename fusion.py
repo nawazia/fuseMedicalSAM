@@ -153,21 +153,20 @@ class DistillationLoss(nn.Module):
         return loss * (self.temperature ** 2)
 
 class CombinedLoss(nn.Module):
-    def __init__(self, dice_weight=1.0, bce_weight=1.0, lambda_weight=0.9, temperature=1.0):
+    def __init__(self, seg_weight=0.5, lambda_weight=0.9, temperature=1.0):
         super(CombinedLoss, self).__init__()
         self.dice_loss = DiceLoss()
         self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
         self.distillation_loss = DistillationLoss(temperature=temperature)
 
-        self.dice_weight = dice_weight
-        self.bce_weight = bce_weight
+        self.seg_weight = seg_weight
         self.lambda_weight = lambda_weight
 
     def forward(self, pred_logits, ground_truth_masks, teacher_logits=None):
         dice_loss = self.dice_loss(pred_logits, ground_truth_masks)
         bce_loss = self.bce_loss(pred_logits, ground_truth_masks)
         
-        segmentation_loss = (self.bce_weight * bce_loss) + (self.dice_weight * dice_loss)
+        segmentation_loss = (self.seg_weight * bce_loss) + ((1-self.seg_weight) * dice_loss)
         if teacher_logits is not None:
             distillation_loss = self.distillation_loss(pred_logits, teacher_logits)
             combined_loss = self.lambda_weight * segmentation_loss + \
