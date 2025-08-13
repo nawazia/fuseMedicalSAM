@@ -372,7 +372,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
 def main(data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, colab=False):
     dataset = MiniMSAMDataset(data_path, json_path, "train")
 
-    target = "SAM4Med"
+    target = "MedSAM"
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
     print(f"Models to be used: {models}")
     # KE
