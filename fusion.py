@@ -36,6 +36,7 @@ def RegionLevelFusion(models, mask_path, mask_filename):
         mask_path_full = os.path.join(mask_path, model_name, os.path.basename(mask_filename)[:-4] + "_mask_logits.npz")
         cur = np.load(mask_path_full)
         cur_mask = cur["mask_logits"]
+        print(mask_path_full, cur_mask.shape)
         cur_bce = cur["bce_loss"]
         if comp_mask is None:
             comp_mask = cur_mask
