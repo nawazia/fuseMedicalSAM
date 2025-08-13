@@ -297,7 +297,7 @@ def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=Fa
 
             if fancy:
                 info = os.path.basename(data["image_filename"][0]).split("--")
-                modality = info[0]
+                modality = info[0].split("_")[0]
                 mscores = modality_dice.get(modality, [])
                 mscores.append(dice_loss.item())
                 modality_dice[modality] = mscores
