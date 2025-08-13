@@ -267,7 +267,7 @@ def fuse_multithread(models: list,
     print(counts)
     return save_path
 
-def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fancy=False):
+def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=False, fancy=False):
     model.eval()
     test_losses = []
     test_bce_losses = []
@@ -276,7 +276,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fanc
         modality_dice = {}
         dataset_dice = {}
 
-    pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
+    pbar_test = tqdm.tqdm(dataloader, desc=split)
     with torch.no_grad():
         for data in pbar_test:
             if debug:
@@ -316,7 +316,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fanc
     avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
     avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
     
-    print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
+    print(f"Avg {split} Loss: {avg_val_loss:.4f} | Avg {split} BCE: {avg_val_bce:.4f} | Avg {split} Dice: {avg_val_dice:.4f}")
     if fancy:
         print("---Modality Scores---")
         for mod, scores in sorted(modality_dice.items(), key=lambda item: 1 - np.mean(item[1])):
@@ -327,7 +327,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, debug=False, fanc
             print(f"{dat}: {1 - np.mean(scores)}")
     return
 
-def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
+def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
     '''
     1. Load target model in train mode.
 
@@ -353,6 +353,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     '''
     dataset.set_transforms(target)
     dataset.set_debug(debug)
+    val_dataset.set_transforms(target)
     test_dataset.set_transforms(target)
     dataset.set_fused(fused_path)
     model = load_model(target, device, colab)
@@ -365,6 +366,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     optimizer = Adam(model.parameters(), lr=1e-4)
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
     for epoch in range(epochs):
@@ -398,7 +400,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
                 'distillation_loss': f'{distillation_loss.item():.4f}'
             })
         pbar_train.close()
-        eval_post_epoch(model, test_dataloader, criterion, device)
+        eval_post_epoch(model, val_dataloader, criterion, device, split="Val")
     
     print("Training complete!")
     eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
@@ -476,6 +478,7 @@ def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
 
 def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
     dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "train")
+    val_dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "val")
     test_dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "test")
 
     models = ["MedSAM", "SAM4Med", "SAM-Med2D"]#, "Med-SA"]
@@ -489,7 +492,7 @@ def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusio
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(os.path.dirname(mask_path), "fused"), method=fusion, max_workers=num_workers)
     dataset.set_simple(False)
     # Continual training
-    model = continual_training(target, dataset, test_dataset, f"fused_{fusion}", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
+    model = continual_training(target, dataset, val_dataset, test_dataset, f"fused_{fusion}", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
     torch.save(model.state_dict(), f"/content/drive/My Drive/fused_{target}_{fusion}.pth")
     external_eval(model, data_path, CombinedLoss(), num_workers=num_workers, device=device)
     return
