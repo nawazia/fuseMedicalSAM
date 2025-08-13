@@ -327,86 +327,6 @@ def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=Fa
             print(f"{dat}: {1 - np.mean(scores)}")
     return
 
-def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
-    '''
-    1. Load target model in train mode.
-
-
-    Parameters
-    ----------
-    target : str
-        Pre-trained finetuned SAM to be used for target model.
-    dataset : MiniMSAMDataset
-        Dataset for the dataset containing images.
-    fused_path : str
-        Path where the fused mask_logits are saved. Defaults to "fused".
-    device : str
-        Device from ["cuda", "mps", "cpu"]. Defaults to "cpu".
-    max_workers : int
-        Maximum number of threads to use. Defaults to min(32, os.cpu_count() + 4).
-    colab : bool
-        Flag to indicate Colab use. Defaults to False.
-
-    Returns
-    -------
-    None
-    '''
-    dataset.set_transforms(target)
-    dataset.set_debug(debug)
-    val_dataset.set_transforms(target)
-    test_dataset.set_transforms(target)
-
-    dataset.set_fused(fused_path)
-    model = load_model(target, device, colab)
-    if args.device == "mps":
-        gpu_memory_bytes = torch.mps.current_allocated_memory()
-    else:
-        gpu_memory_bytes = torch.cuda.memory_allocated()
-    print(f"VRAM memory allocated: {gpu_memory_bytes / (1024**2):.2f} MB")
-    print(f"Loaded model: {target}")
-    optimizer = Adam(model.parameters(), lr=1e-4)
-    criterion = CombinedLoss()
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
-    for epoch in range(epochs):
-        print(f"Epoch {epoch+1}/{epochs}")
-
-        model.train()
-        pbar_train = tqdm.tqdm(dataloader, desc="Training")
-        for i, data in enumerate(pbar_train):
-            if debug:
-                print("image:", data["image_filename"])
-            # mask_filenames = [os.path.basename(f[0]) for f in data['mask_filenames']] # Flatten list of lists and get base filename
-            data['image'] = data['image'].to(device).float()
-            data["boxes"] = data['boxes'].to(device)
-
-            # Generate mask logits
-            mask_logits, iou_preds = model(data)                   # [4, 1, 208, 174]
-            assert mask_logits.dim() == 4
-            gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
-            teacher_logits = data["teacher_logits"].to(device)
-            # calculate losses
-            optimizer.zero_grad()
-            gt = gt.float()
-            mask_logits = mask_logits.float()
-            combined_loss, bce_loss, dice_loss, distillation_loss = criterion(mask_logits.permute(1, 0, 2, 3), gt, teacher_logits)
-            combined_loss.backward()
-            optimizer.step()
-            pbar_train.set_postfix({
-                'total_loss': f'{combined_loss.item():.4f}',
-                'bce_loss': f'{bce_loss.item():.4f}',
-                'dice_loss': f'{dice_loss.item():.4f}',
-                'distillation_loss': f'{distillation_loss.item():.4f}'
-            })
-        pbar_train.close()
-        eval_post_epoch(model, val_dataloader, criterion, device, split="Val")
-    
-    print("Training complete!")
-    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
-    return model
-
 def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
     # first eval on kits
     kits_path = os.path.join("gs://sam-med2d-17k", data_path, "kits23")
@@ -476,6 +396,88 @@ def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
     
     print(f"Avg SegRap2023 BCE: {avg_val_bce:.4f} | Avg SegRap2023 Dice: {avg_val_dice:.4f}")
     return 0
+
+def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, debug=False, epochs=10):
+    '''
+    1. Load target model in train mode.
+
+
+    Parameters
+    ----------
+    target : str
+        Pre-trained finetuned SAM to be used for target model.
+    dataset : MiniMSAMDataset
+        Dataset for the dataset containing images.
+    fused_path : str
+        Path where the fused mask_logits are saved. Defaults to "fused".
+    device : str
+        Device from ["cuda", "mps", "cpu"]. Defaults to "cpu".
+    max_workers : int
+        Maximum number of threads to use. Defaults to min(32, os.cpu_count() + 4).
+    colab : bool
+        Flag to indicate Colab use. Defaults to False.
+
+    Returns
+    -------
+    None
+    '''
+    dataset.set_transforms(target)
+    dataset.set_debug(debug)
+    val_dataset.set_transforms(target)
+    test_dataset.set_transforms(target)
+
+    dataset.set_fused(fused_path)
+    model = load_model(target, device, colab)
+    if args.device == "mps":
+        gpu_memory_bytes = torch.mps.current_allocated_memory()
+    else:
+        gpu_memory_bytes = torch.cuda.memory_allocated()
+    print(f"VRAM memory allocated: {gpu_memory_bytes / (1024**2):.2f} MB")
+    print(f"Loaded model: {target}")
+    optimizer = Adam(model.parameters(), lr=1e-4)
+    criterion = CombinedLoss()
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    external_eval(model, dataset.data_path, criterion, num_workers, device)
+    eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
+    for epoch in range(epochs):
+        print(f"Epoch {epoch+1}/{epochs}")
+
+        model.train()
+        pbar_train = tqdm.tqdm(dataloader, desc="Training")
+        for i, data in enumerate(pbar_train):
+            if debug:
+                print("image:", data["image_filename"])
+            # mask_filenames = [os.path.basename(f[0]) for f in data['mask_filenames']] # Flatten list of lists and get base filename
+            data['image'] = data['image'].to(device).float()
+            data["boxes"] = data['boxes'].to(device)
+
+            # Generate mask logits
+            mask_logits, iou_preds = model(data)                   # [4, 1, 208, 174]
+            assert mask_logits.dim() == 4
+            gt = data["original_masks"].to(device)      # [1, 4, 208, 174]
+            teacher_logits = data["teacher_logits"].to(device)
+            # calculate losses
+            optimizer.zero_grad()
+            gt = gt.float()
+            mask_logits = mask_logits.float()
+            combined_loss, bce_loss, dice_loss, distillation_loss = criterion(mask_logits.permute(1, 0, 2, 3), gt, teacher_logits)
+            combined_loss.backward()
+            optimizer.step()
+            pbar_train.set_postfix({
+                'total_loss': f'{combined_loss.item():.4f}',
+                'bce_loss': f'{bce_loss.item():.4f}',
+                'dice_loss': f'{dice_loss.item():.4f}',
+                'distillation_loss': f'{distillation_loss.item():.4f}'
+            })
+        pbar_train.close()
+        eval_post_epoch(model, val_dataloader, criterion, device, split="Val")
+    
+    print("Training complete!")
+    eval_post_epoch(model, test_dataloader, criterion, device, fancy=True)
+    return model
+
 
 def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusion="i", num_workers=0, epochs=10, debug=False):
     dataset = MiniMSAMDataset("sam-med2d-17k", data_path, json_path, "train")
