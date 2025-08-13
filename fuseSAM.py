@@ -209,7 +209,7 @@ def fuse_multithread(models: list,
     print(counts)
     return save_path
 
-def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, organ_info=None):
+def eval_post_epoch(model, dataloader, criterion, device, split="Test", fancy=False, organ_info=None):
     model.eval()
     test_losses = []
     test_bce_losses = []
@@ -227,7 +227,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
             for key in mapping:
                 mapping[key] = {v: k for k, v in mapping[key].items()}
 
-    pbar_test = tqdm.tqdm(test_dataloader, desc="Testing")
+    pbar_test = tqdm.tqdm(dataloader, desc=split)
     with torch.no_grad():
         for data in pbar_test:
             data['image'] = data['image'].to(device).float()
@@ -267,7 +267,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
                 dataset_dice[dataset] = dscores
             
             pbar_test.set_postfix({
-                'test_loss': f'{combined_loss.item():.4f}',
+                f'{split.lower()}_loss': f'{combined_loss.item():.4f}',
             })
 
     pbar_test.close()
@@ -275,7 +275,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
     avg_val_bce = sum(test_bce_losses) / len(test_bce_losses)
     avg_val_dice = sum(test_dice_losses) / len(test_dice_losses)
     
-    print(f"Avg Test Loss: {avg_val_loss:.4f} | Avg Test BCE: {avg_val_bce:.4f} | Avg Test Dice: {avg_val_dice:.4f}")
+    print(f"Avg {split} Loss: {avg_val_loss:.4f} | Avg {split} BCE: {avg_val_bce:.4f} | Avg {split} Dice: {avg_val_dice:.4f}")
     if fancy:
         print("---Modality Scores---")
         for mod, scores in sorted(modality_dice.items(), key=lambda item: 1 - np.mean(item[1])):
@@ -291,7 +291,7 @@ def eval_post_epoch(model, test_dataloader, criterion, device, fancy=False, orga
                 print(f"{org}: {1 - np.mean(scores)}")
     return
 
-def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
+def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : MiniMSAMDataset, test_dataset : MiniMSAMDataset, fused_path : str = "fused", device="cpu", num_workers=0, colab=False, epochs=10):
     '''
     1. Load target model in train mode.
 
@@ -316,7 +316,9 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     None
     '''
     dataset.set_transforms(target)
+    val_dataset.set_transforms(target)
     test_dataset.set_transforms(target)
+
     dataset.set_fused(fused_path)
     model = load_model(target, device, colab)
     if args.device == "mps":
@@ -327,7 +329,8 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
     print(f"Loaded model: {target}")
     optimizer = Adam(model.parameters(), lr=1e-4)
     criterion = CombinedLoss()
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+    val_dataloader = DataLoader(val_dataloader, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     if os.path.basename(os.path.dirname(dataset.data_path)) == "1.7K":
         organ_info = os.path.join(os.path.dirname(dataset.json_path), "SAMed2D_v1_class_mapping_id.json")
@@ -363,7 +366,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, test_dataset : M
                 'distillation_loss': f'{distillation_loss.item():.4f}'
             })
         pbar_train.close()
-        eval_post_epoch(model, test_dataloader, criterion, device)
+        eval_post_epoch(model, val_dataloader, criterion, device)
     
     print("Training complete!")
     eval_post_epoch(model, test_dataloader, criterion, device, fancy=True, organ_info=organ_info)
@@ -381,8 +384,9 @@ def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusio
     fused_path = fuse_multithread(models, dataset, mask_path=mask_path, save_path=os.path.join(data_path, "fused"), method=fusion, max_workers=num_workers)
     dataset.set_simple(False)
     # Continual training
+    val_dataset = MiniMSAMDataset(data_path, json_path, "val")
     test_dataset = MiniMSAMDataset(data_path, json_path, "test")
-    model = continual_training(target, dataset, test_dataset, fused_path, device=device, num_workers=num_workers, colab=colab, epochs=epochs)
+    model = continual_training(target, dataset, val_dataset, test_dataset, fused_path, device=device, num_workers=num_workers, colab=colab, epochs=epochs)
     return
 
 
