@@ -327,9 +327,9 @@ def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=Fa
             print(f"{dat}: {1 - np.mean(scores)}")
     return
 
-def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
+def external_eval(model, criterion, num_workers=0, device="cuda"):
     # first eval on kits
-    kits_path = os.path.join("gs://sam-med2d-17k", data_path, "kits23")
+    kits_path = os.path.join("gs://sam-med2d-17k", "data", "kits23")
     kits_ds = MiniMSAMDataset("sam-med2d-17k", kits_path, os.path.join(kits_path, "KiTS23.json"), "test")
     kits_dl = DataLoader(kits_ds, batch_size=1, shuffle=False, num_workers=num_workers)
     model.eval()
@@ -363,7 +363,7 @@ def external_eval(model, data_path, criterion, num_workers=0, device="cuda"):
     print(f"Avg KiTS23 BCE: {avg_val_bce:.4f} | Avg KiTS23 Dice: {avg_val_dice:.4f}")
     
     # first eval on kits
-    segrap_path = os.path.join("gs://sam-med2d-17k", data_path, "segrap23")
+    segrap_path = os.path.join("gs://sam-med2d-17k", "data", "segrap23")
     segrap_ds = MiniMSAMDataset("sam-med2d-17k", segrap_path, os.path.join(segrap_path, "segrap23.json"), "test")
     segrap_dl = DataLoader(segrap_ds, batch_size=1, shuffle=False, num_workers=num_workers)
     model.eval()
@@ -439,7 +439,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    external_eval(model, dataset.data_path, criterion, num_workers, device)
+    external_eval(model, criterion, num_workers, device)
     eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
@@ -497,7 +497,7 @@ def main(target: str, data_path: str, json_path: str, device: str = "cpu", fusio
     # Continual training
     model = continual_training(target, dataset, val_dataset, test_dataset, f"fused_{fusion}", device=device, num_workers=num_workers, colab=True, debug=debug, epochs=epochs)
     torch.save(model.state_dict(), f"/content/drive/My Drive/fused_{target}_{fusion}.pth")
-    external_eval(model, data_path, CombinedLoss(), num_workers=num_workers, device=device)
+    external_eval(model, CombinedLoss(), num_workers=num_workers, device=device)
     return
 
 
