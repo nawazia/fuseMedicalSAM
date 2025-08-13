@@ -4,7 +4,7 @@ import cv2
 import torch
 import torch.nn as nn
 
-def ImageLevelFusion(models, mask_path, mask_filename):
+def ImageLevelFusion(models, mask_path, mask_filename, alpha=0.5):
     min_loss = np.inf
     data = (None, None)
     for model_name in models:
@@ -12,7 +12,7 @@ def ImageLevelFusion(models, mask_path, mask_filename):
         cur = np.load(mask_path_full)
         dice = cur["dice_loss"]
         bce = cur["bce_loss"]
-        loss = bce.mean() + dice
+        loss = alpha*bce.mean() + (1-alpha)*dice
         if loss < min_loss:
             data = (model_name, cur)
 
