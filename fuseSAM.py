@@ -94,7 +94,6 @@ def knowledge_externalization(models : list,
             gt = data["original_masks"].to(device)  # [1, 4, 208, 174]
             # calculate losses
             dice, bce, iou = calculate_segmentation_losses(gt, mask_logits.permute(1, 0, 2, 3)) # bce is now raw
-            print(bce.shape)
             loss.extend(bce.mean(axis=(-1, -2)).flatten().tolist())
             # print(f"Mask logits shape: {mask_logits.shape}, dtype: {mask_logits.dtype}")
             # Save mask logits & losses

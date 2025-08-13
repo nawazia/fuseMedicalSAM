@@ -287,7 +287,7 @@ def calculate_segmentation_losses(gt_masks, mask_logits):
     # The output shape will be [B, C, H, W]
     bce_loss_fn = nn.BCEWithLogitsLoss(reduction='none')
     bce_pixel_losses = bce_loss_fn(mask_logits, gt_masks)
-    bce_pixel_losses_numpy = bce_pixel_losses.squeeze().detach().cpu().numpy()
+    bce_pixel_losses_numpy = bce_pixel_losses.squeeze(0).detach().cpu().numpy()
 
     # # To get a single BCE loss value per mask (channel), average over H and W
     # # The result will be shape [B, C]
