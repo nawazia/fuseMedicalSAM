@@ -364,8 +364,8 @@ def external_eval(model, target, criterion, num_workers=0, device="cuda"):
     print(f"Avg KiTS23 BCE: {avg_val_bce:.4f} | Avg KiTS23 Dice: {avg_val_dice:.4f}")
     
     # first eval on kits
-    segrap_path = os.path.join("data", "segrap23")
-    segrap_ds = MiniMSAMDataset("sam-med2d-17k", segrap_path, os.path.join(segrap_path, "segrap23.json"), "test")
+    segrap_path = os.path.join("data", "segrap2023")
+    segrap_ds = MiniMSAMDataset("sam-med2d-17k", segrap_path, os.path.join(segrap_path, "segrap2023.json"), "test")
     segrap_ds.set_transforms(target)
     segrap_dl = DataLoader(segrap_ds, batch_size=1, shuffle=False, num_workers=num_workers)
     model.eval()
