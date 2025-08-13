@@ -330,7 +330,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     optimizer = Adam(model.parameters(), lr=1e-4)
     criterion = CombinedLoss()
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
-    val_dataloader = DataLoader(val_dataloader, batch_size=1, shuffle=False, num_workers=num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     if os.path.basename(os.path.dirname(dataset.data_path)) == "1.7K":
         organ_info = os.path.join(os.path.dirname(dataset.json_path), "SAMed2D_v1_class_mapping_id.json")
