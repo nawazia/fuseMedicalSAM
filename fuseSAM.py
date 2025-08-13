@@ -355,6 +355,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     dataset.set_debug(debug)
     val_dataset.set_transforms(target)
     test_dataset.set_transforms(target)
+    
     dataset.set_fused(fused_path)
     model = load_model(target, device, colab)
     if args.device == "mps":
