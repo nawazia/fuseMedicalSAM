@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 
 
-@torch.no_grad()
+# @torch.no_grad()
 def medsam_inference(medsam_model, img_embed, box_1024, H, W, return_logits=False):
     box_torch = torch.as_tensor(box_1024, dtype=torch.float, device=img_embed.device)
     if len(box_torch.shape) == 2:

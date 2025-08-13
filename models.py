@@ -52,8 +52,8 @@ class MedSAM(nn.Module):
         # newh, neww = data["prepad_size"]
         # segs = np.zeros((len(boxes), H, W), dtype=np.float32)
 
-        with torch.no_grad():
-            image_embedding = self.medsam.image_encoder(img.float())
+        # with torch.no_grad():
+        image_embedding = self.medsam.image_encoder(img.float())
 
         if len(boxes.shape) == 2:
             boxes = boxes[:, None, :]  # (B, 1, 4)
