@@ -355,7 +355,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     dataset.set_debug(debug)
     val_dataset.set_transforms(target)
     test_dataset.set_transforms(target)
-    
+
     dataset.set_fused(fused_path)
     model = load_model(target, device, colab)
     if args.device == "mps":
@@ -366,7 +366,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     print(f"Loaded model: {target}")
     optimizer = Adam(model.parameters(), lr=1e-4)
     criterion = CombinedLoss()
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
