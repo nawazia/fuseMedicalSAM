@@ -430,6 +430,7 @@ if __name__ == "__main__":
     
     dataset = MiniMSAMDataset(data_path=args.data_path, json_path=args.json_path)
     print(f"Dataset length: {len(dataset)}")
+    print(f"Number of masks: {dataset.get_num_masks()}")
     dataset.set_transforms(model="MedSAM")
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
     
