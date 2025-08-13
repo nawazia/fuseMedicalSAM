@@ -62,6 +62,7 @@ def knowledge_externalization(models : list,
     print("bucket_name:", bucket_name)
 
     num_masks = dataset.get_num_masks()
+    print("Number of masks:", num_masks)
 
     for model_name in models:
         # check if all logits already exist
