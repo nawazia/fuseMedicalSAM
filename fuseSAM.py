@@ -329,7 +329,7 @@ def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=Fa
 
 def external_eval(model, criterion, num_workers=0, device="cuda"):
     # first eval on kits
-    kits_path = os.path.join("gs://sam-med2d-17k", "data", "kits23")
+    kits_path = os.path.join("data", "kits23")
     kits_ds = MiniMSAMDataset("sam-med2d-17k", kits_path, os.path.join(kits_path, "KiTS23.json"), "test")
     kits_dl = DataLoader(kits_ds, batch_size=1, shuffle=False, num_workers=num_workers)
     model.eval()
@@ -363,7 +363,7 @@ def external_eval(model, criterion, num_workers=0, device="cuda"):
     print(f"Avg KiTS23 BCE: {avg_val_bce:.4f} | Avg KiTS23 Dice: {avg_val_dice:.4f}")
     
     # first eval on kits
-    segrap_path = os.path.join("gs://sam-med2d-17k", "data", "segrap23")
+    segrap_path = os.path.join("data", "segrap23")
     segrap_ds = MiniMSAMDataset("sam-med2d-17k", segrap_path, os.path.join(segrap_path, "segrap23.json"), "test")
     segrap_dl = DataLoader(segrap_ds, batch_size=1, shuffle=False, num_workers=num_workers)
     model.eval()
