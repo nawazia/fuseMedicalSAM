@@ -52,7 +52,7 @@ def RegionLevelFusion(models, mask_path, mask_filename):
                 comp_bce[is_better_pixel] = cur_bce[is_better_pixel]
             except:
                 print(mask_path_full)
-                print(comp_mask.shape, is_better_pixel.shape)
+                print(comp_bce.shape, comp_mask.shape, is_better_pixel.shape)
                 raise IndexError
     
     result = {}
