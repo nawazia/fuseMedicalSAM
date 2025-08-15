@@ -441,7 +441,7 @@ def continual_training(target : str, dataset : MiniMSAMDataset, val_dataset : Mi
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    # external_eval(model, target, criterion, num_workers, device)
+    external_eval(model, target, criterion, num_workers, device)
     eval_post_epoch(model, test_dataloader, criterion, device, debug, fancy=True)
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
