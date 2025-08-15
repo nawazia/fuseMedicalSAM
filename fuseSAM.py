@@ -328,6 +328,7 @@ def eval_post_epoch(model, dataloader, criterion, device, split="Test", debug=Fa
     return
 
 def external_eval(model, target, criterion, num_workers=0, device="cuda"):
+    print("Running external evaluation")
     # first eval on kits
     kits_path = os.path.join("data", "kits23")
     kits_ds = MiniMSAMDataset("sam-med2d-17k", kits_path, os.path.join(kits_path, "KiTS23.json"), "test")
